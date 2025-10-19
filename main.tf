@@ -4,11 +4,20 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# S3 Bucket
-resource "aws_s3_bucket" "stonk_bucket" {
-    bucket = "stonkwatchmen-stonk-bucket"
+# S3 Bucket to store Terraform state
+resource "aws_s3_bucket" "terraform_bucket" {
+    bucket = "stonkwatchmen-terraform-bucket"
 
     tags = {
-        Name = "Stonk Bucket"
+        Name = "Terraform Bucket"
+    }
+}
+
+# S3 Bucket to host static website
+resource "aws_s3_bucket" "website_bucket" {
+    bucket = "stonkwatchmen-website-bucket"
+
+    tags = {
+        Name = "Website Bucket"
     }
 }
