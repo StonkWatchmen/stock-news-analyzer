@@ -68,7 +68,7 @@ jobs:
 
       # Step 7: Store Terraform state in S3
       - name: Store state 
-        run: aws s3 cp ./terraform.tfstate s3://stock-news-analyzer-terraform-state-bucket 
+        run: aws s3 cp ./terraform/terraform.tfstate s3://stock-news-analyzer-terraform-state-bucket 
 
   terraform_destroy:
     name: "Terraform_destroy"
@@ -107,7 +107,7 @@ jobs:
 
       # Step 4: Retrieve Terraform state from S3
       - name: Retrieve state
-        run: aws s3 cp s3://stock-news-analyzer-terraform-state-bucket/terraform.tfstate .
+        run: aws s3 cp s3://stock-news-analyzer-terraform-state-bucket/terraform/terraform.tfstate .
         working-directory: ./terraform
 
       # Step 5: Initialize terraform working directory
