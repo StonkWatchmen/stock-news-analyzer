@@ -54,14 +54,17 @@ jobs:
       # Step 4: Initialize Terraform working directory
       - name: Terraform Init
         run: terraform init
+        working-directory: ./terraform
 
       # Step 5: Preview the infrastructure changes
       - name: Terraform Plan
         run: terraform plan
+        working-directory: ./terraform
 
       # Step 6: Apply the infrastructure changes
       - name: Terraform Apply
         run: terraform apply -auto-approve # Auto-approve flag skips manual confirmation
+        working-directory: ./terraform
 
       # Step 7: Store Terraform state in S3
       - name: Store state 
@@ -105,11 +108,14 @@ jobs:
       # Step 4: Retrieve Terraform state from S3
       - name: Retrieve state
         run: aws s3 cp s3://stock-news-analyzer-terraform-state-bucket/terraform.tfstate .
+        working-directory: ./terraform
 
       # Step 5: Initialize terraform working directory
       - name: Terraform Init
         run: terraform init
+        working-directory: ./terraform
 
       # Step 6: Destroy the infrastructure
       - name: Terraform Destroy
         run: terraform destroy -auto-approve # Auto-approve flag skips manual confirmation    
+        working-directory: ./terraform
