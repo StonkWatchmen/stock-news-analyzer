@@ -6,18 +6,20 @@ provider "aws" {
 
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "stonkwatchmen-terraform-bucket"
+    bucket = "stock-news-analyzer-terraform-state-bucket"
+    force_destroy = true
 
     tags = {
-        Name = "Terraform Bucket"
+        Name = "Stock News Analyzer Terraform State Bucket"
     }
 }
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "website_bucket" {
-    bucket = "stonkwatchmen-website-bucket"
+    bucket = "stock-news-analyzer-website-bucket"
+    force_destroy = true
 
     tags = {
-        Name = "Website Bucket"
+        Name = "Stock News Analyzer Website Bucket"
     }
 }
