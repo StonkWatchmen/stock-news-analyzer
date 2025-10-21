@@ -1,6 +1,6 @@
 # RDS Instance
-resource "aws_db_instance" "stonk_db" {
-  identifier             = "stonk-db"                                     # Unique identifier for the RDS instance
+resource "aws_db_instance" "stonkwatchmen_db" {
+  identifier             = "stonkwatchmen-db"                                 # Unique identifier for the RDS instance
   allocated_storage      = 20                                                 # 20GB of storage
   storage_type           = "gp2"                                              # General Purpose SSD
   engine                 = "mysql"                                            # MySQL database engine
