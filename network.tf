@@ -1,5 +1,5 @@
 # VPC and Networking Resources
-# Create a VPC, subnets, and related networking infrastructure for WordPress.
+# Create a VPC, subnets, and related networking infrastructure for Stock News Analyzer.
 
 # VPC
 resource "aws_vpc" "stock_news_analyzer_vpc" {
