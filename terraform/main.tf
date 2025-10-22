@@ -15,12 +15,12 @@ resource "aws_s3_bucket" "terraform_bucket" {
 }
 
 # S3 Bucket to host static website
-resource "aws_s3_bucket" "website_bucket" {
-    bucket = "stock-news-analyzer-website-bucket"
+resource "aws_s3_bucket" "react_bucket" {
+    bucket = "stock-news-analyzer-react-app-bucket"
     force_destroy = true
 
     tags = {
-        Name = "Stock News Analyzer Website Bucket"
+        Name = "Stock News Analyzer React App Bucket"
     }
 }
 
