@@ -71,6 +71,18 @@ jobs:
         run: aws s3 cp terraform.tfstate s3://stock-news-analyzer-terraform-state-bucket 
         working-directory: ./terraform
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Build React App
+        run: npm run build
+        working-directory: ./stock-news-app
+
+      - name: Upload React App to S3
+        run: aws s3 cp . s3://stock-news-analyzer-react-bucket --recursive
+
   terraform_destroy:
     name: "Terraform_destroy"
     # Condition to run this job only when 'Terraform_destroy' is selected
