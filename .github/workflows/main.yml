@@ -76,6 +76,10 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install npm
+        run: npm install
+        working-directory: ./stock-news-app
+
       - name: Build React App
         run: npm run build
         working-directory: ./stock-news-app
