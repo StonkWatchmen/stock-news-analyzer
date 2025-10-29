@@ -37,7 +37,7 @@ resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
 }
 
 resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" {
-  bucket = aws_s3_react_bucket.react_bucket.id
+  bucket = aws_s3_bucket.react_bucket
 
   block_public_acls = false
   block_public_policy = false
