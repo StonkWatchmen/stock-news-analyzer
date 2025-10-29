@@ -30,12 +30,16 @@ data "aws_ami" "amazonlinux" {
 
 data "aws_iam_policy_document" "get_object_iam_policy" {
     statement {
-         actions = [
+        effect = "Allow"
+        actions = [
             "s3:GetObject"
-         ]
-
-         resources = [
+        ]
+        resources = [
             "${aws_s3_bucket.react_bucket.arn}/*"
-         ]
+        ]
+        principals {
+          type = "AWS"
+          identifiers = ["*"]
+        }
     }
 }
