@@ -48,22 +48,7 @@ resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" 
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
 
-  policy = jsondecode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid = "PublicReadGetObject"
-        Effect = "Allow"
-        Principal = "*"
-        Action = [
-          "s3:GetObject"
-        ]
-        Resource = [
-          "${aws_s3_bucket.react_bucket.arn}/*"
-        ]
-      }
-    ]
-  })
+  policy = data.aws_iam_policy_document.get_object_iam_policy.json
 }
 
 # RDS Instance
