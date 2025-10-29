@@ -4,6 +4,46 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# IAM Role for Lambda Function
+data "aws_iam_policy_document" "assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+
+resource "aws_iam_role" "iam_for_lambda" {
+  name               = "iam_for_lambda"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json 
+}
+
+
+# Package Lambda Function
+data "archive_file" "name" {
+  type = "zip"
+  source_file = "${path.module}/../lambda/stock_news_analyzer_lambda.py"
+  output_path = "${path.module}/../lambda/stock_news_analyzer_lambda.zip"
+}
+
+
+# Lambda Function
+resource "aws_lambda_function" "lambda_function" {
+  filename         = data.archive_file.name.output_path
+  function_name    = "stock_news_analyzer_lambda"
+  role             = aws_iam_role.iam_for_lambda.arn
+  handler          = "stock_news_analyzer_lambda.lambda_handler"
+  source_code_hash = data.archive_file.name.output_base64sha256
+  runtime          = "python3.10"
+  
+}
+
+
+
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
     bucket = "stock-news-analyzer-terraform-state-bucket"
