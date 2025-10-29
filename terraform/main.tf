@@ -24,6 +24,48 @@ resource "aws_s3_bucket" "react_bucket" {
     }
 }
 
+resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
+  bucket = aws_s3_bucket.react_bucket.id
+
+  index_document {
+    suffix = "index.html"
+  }
+
+  error_document {
+    key = "error.html"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" {
+  bucket = aws_s3_react_bucket.react_bucket.id
+
+  block_public_acls = false
+  block_public_policy = false
+  ignore_public_acls = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_policy" "react_bucket_policy" {
+  bucket = aws_s3_bucket.react_bucket.id
+
+  policy = jsondecode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid = "PublicReadGetObject"
+        Effect = "Allow"
+        Principal = "*"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = [
+          "${aws_s3_bucket.react_bucket.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
 # RDS Instance
 resource "aws_db_instance" "stock_news_analyzer_db" {
   identifier             = "stock-news-analyzer-db"                           # Unique identifier for the RDS instance
