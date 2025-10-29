@@ -1,4 +1,7 @@
-variable "project_name" {type = string default = "stock-news-analyzer"}
+variable "project_name" {
+  type    = string
+  default = "stock-news-analyzer"
+}
 
 variable "alpha_vantage_api_key" {
   type = string
