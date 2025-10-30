@@ -26,4 +26,21 @@ data "aws_ami" "amazonlinux" {
         name   = "architecture"
         values = ["x86_64"]
     }
+    
+}
+
+data "aws_iam_policy_document" "get_object_iam_policy" {
+    statement {
+        effect = "Allow"
+        actions = [
+            "s3:GetObject"
+        ]
+        resources = [
+            "${aws_s3_bucket.react_bucket.arn}/*"
+        ]
+        principals {
+          type = "AWS"
+          identifiers = ["*"]
+        }
+    }
 }
