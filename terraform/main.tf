@@ -11,7 +11,7 @@ data "aws_iam_policy_document" "assume_role" {
 
     principals {
       type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
+      identifiers = ["lambda.amazonaws.com"]
     }
   }
 }
@@ -22,25 +22,51 @@ resource "aws_iam_role" "iam_for_lambda" {
   assume_role_policy = data.aws_iam_policy_document.assume_role.json 
 }
 
+# IAM Policy Attachment for CloudWatch Logs
+resource "aws_iam_policy_document" "assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
 
-# Package Lambda Function
-data "archive_file" "name" {
-  type = "zip"
-  source_file = "${path.module}/../lambda/stock_news_analyzer_lambda.py"
-  output_path = "${path.module}/../lambda/stock_news_analyzer_lambda.zip"
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
 }
 
+
+# Package Lambda Function
+data "archive_file" "name"{
+  type        = "zip"
+  source_file = "${path.module}/lambda_function/lambda_handler.py"
+  output_path = "${path.module}/lambda.zip"
+}
+
+# Public URL to test quickly the Lambda function
+resource "aws_lambda_function_url" "lambda_url" {
+  function_name = aws_lambda_function.lambda_function.function_name
+  authorization_type = "NONE"
+  cors {
+    allow_origins = ["*"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_headers = ["*"]
+  }
+  
+}
 
 # Lambda Function
 resource "aws_lambda_function" "lambda_function" {
   filename         = data.archive_file.name.output_path
   function_name    = "stock_news_analyzer_lambda"
   role             = aws_iam_role.iam_for_lambda.arn
-  handler          = "stock_news_analyzer_lambda.lambda_handler"
+  handler          = "lambda_handler.lambda_handler"
   source_code_hash = data.archive_file.name.output_base64sha256
-  runtime          = "python3.10"
-  
-}
+  runtime          = "python3.12"
+  depends_on = [    aws_iam_role_policy_attachment.lambda_logs,
+    aws_iam_role_policy_attachment.comprehend_access]
+  }
+
+
 
 
 
@@ -64,6 +90,8 @@ resource "aws_s3_bucket" "react_bucket" {
     }
 }
 
+
+# S3 Bucket Website Configuration
 resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
   bucket = aws_s3_bucket.react_bucket.id
 
@@ -76,6 +104,7 @@ resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
   }
 }
 
+# Disable public access block for the S3 bucket
 resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" {
   bucket = aws_s3_bucket.react_bucket.id
 
@@ -85,6 +114,20 @@ resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" 
   restrict_public_buckets = false
 }
 
+#public read access policy for the S3 bucket
+data "aws_iam_policy_document" "get_object_iam_policy" {
+  statement {
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.react_bucket.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+  }
+}
+
+# Attach the policy to the S3 bucket
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
 
