@@ -1,3 +1,10 @@
+variable "project_name" {
+  type    = string
+  default = "stock-news-analyzer"
+}
+
+
+
 variable "db_username" {
   type      = string
   sensitive = true
