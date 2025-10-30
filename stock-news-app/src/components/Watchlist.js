@@ -1,20 +1,25 @@
-import React, {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {getWatchlist, saveWatchlist } from "../utils/storage";
 
-const TICKER_REGEX = /^[A-Z.\-]{1,10}$/;
+const TICKER_REGEX = /^[A-Z.-]{1,10}$/;    // Allows patterns like BRK.B, RDS.A, etc.
 
 export default function Watchlist() {
+    // Track ticker list, input value, and user error message. 
     const [items, setItems] = useState([]);
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
 
+    // On load -> fetch saved watchlist from localStorage
     useEffect(() => {
         setItems(getWatchlist());
     }, []);
 
     const count = items.length;
+
+    // Disable "Add" button if input is empty or whitespace
     const isDisabled = useMemo(() => !input.trim(), [input]);
 
+    // Keep tickers consistent: trim whitespace and uppercase
     function normalizeTicker(ticker) {
         return ticker.trim().toUpperCase();
     }
@@ -22,6 +27,7 @@ export default function Watchlist() {
     function handleAdd(e) {
         e.preventDefault();
 
+        // Validation chain -> normalize, check format, check duplicates, check limit
         const symbol = normalizeTicker(input);
         if (!symbol) {
             setError("Enter a ticker symbol.");
@@ -40,9 +46,12 @@ export default function Watchlist() {
             return;
         }
         
+        // Updates local state and localStorage
         const next = [...items, symbol].sort();
         setItems(next);
         saveWatchlist(next);
+
+        // Reset form + clear errors
         setInput("");
         setError("");
     }
