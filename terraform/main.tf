@@ -118,17 +118,6 @@ resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" 
 }
 
 # Public read access policy for the S3 bucket
-data "aws_iam_policy_document" "get_object_iam_policy" {
-  statement {
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.react_bucket.arn}/*"]
-
-    principals {
-      type        = "AWS"
-      identifiers = ["*"]
-    }
-  }
-}
 
 # Attach the policy to the S3 bucket
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
@@ -151,15 +140,6 @@ data "aws_subnets" "default" {
   }
 }
 
-resource "aws_db_subnet_group" "stock_news_analyzer_db_subnet_group" {
-  name       = "stock-news-analyzer-db-subnet-group"
-  subnet_ids = data.aws_subnets.default.ids
-
-  tags = {
-    Name = "Stock News Analyzer DB Subnet Group"
-  }
-}
-
 # Security Group for RDS
 data "http" "my_ip" {
   url = "https://checkip.amazonaws.com/"
@@ -169,41 +149,7 @@ locals {
   my_ip_cidr = "${chomp(data.http.my_ip.response_body)}/32"
 }
 
-resource "aws_security_group" "rds_sg" {
-  name        = "stock-news-analyzer-rds-sg"
-  description = "Allow MySQL access from your IP"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress {
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = [local.my_ip_cidr]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "Stock News Analyzer RDS Security Group"
-  }
-}
-
 # RDS Instance
-variable "db_username" {
-  type        = string
-  description = "Database admin username"
-}
-
-variable "db_password" {
-  type        = string
-  description = "Database admin password"
-  sensitive   = true
-}
 
 resource "aws_db_instance" "stock_news_analyzer_db" {
   identifier             = "stock-news-analyzer-db"
