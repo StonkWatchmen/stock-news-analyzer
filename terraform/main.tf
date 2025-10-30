@@ -37,7 +37,7 @@ resource "aws_lambda_function_url" "lambda_url" {
   authorization_type = "NONE"
   cors {
     allow_origins = ["*"]
-    allow_methods = ["GET", "POST"] 
+    allow_methods = ["GET", "POST"]
     allow_headers = ["*"]
   }
 }
@@ -101,6 +101,7 @@ resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
   error_document {
     key = "error.html"
   }
+  depends_on = [ aws_s3_bucket.react_bucket ]
 }
 
 # Disable public access block for the S3 bucket
