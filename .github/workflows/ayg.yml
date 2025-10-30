@@ -1,4 +1,4 @@
-name: "Terraform"
+name: "Terraform-ayg"
 
 # Defines when the workflow will run
 on:
