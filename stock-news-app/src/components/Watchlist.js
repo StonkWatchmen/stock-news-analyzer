@@ -56,6 +56,22 @@ export default function Watchlist() {
         setError("");
     }
 
+    // Remove single ticker
+    function handleRemove(symbol) {
+        const next = items.filter((t) => t !== symbol);
+        setItems(next);
+        saveWatchlist(next);
+    }
+
+    // Clear all tickers (with confirmation)
+    function handleClearAll() {
+        if (!window.confirm("Clear all tickers from your watchlist?")) {
+            return;
+        }
+        setItems([]);
+        saveWatchlist([]);
+    }
+
     return (
         <div className="watchlist-container">
             <h1 className="watchlist-title">Your Watchlist</h1>
@@ -78,12 +94,24 @@ export default function Watchlist() {
 
             <div className="watchlist-meta">
                 <span>{count} {count === 1 ? "ticker" : "tickers"}</span>
+                {count > 0 && (
+                    <button className="watchlist-clear" onClick={handleClearAll}>
+                        Clear All
+                    </button>
+                )}
             </div>
 
             <ul className="watchlist-items">
                 {items.map((t) => (
                     <li key={t} className="watchlist-item">
                         <span className="ticker">{t}</span>
+                        <button
+                            className="remove-btn"
+                            onClick={() => handleRemove(t)}
+                            title="Remove this ticker"
+                        >
+                            x
+                        </button>
                     </li>
                 ))}
             </ul> 
