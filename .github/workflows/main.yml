@@ -72,7 +72,7 @@ jobs:
 
       # Step 8: Store Terraform state in S3
       - name: Store state 
-        run: aws s3 cp terraform.tfstate s3://stock-news-analyzer-terraform-state-bucket 
+        run: aws s3 cp terraform.tfstate s3://stonkwatchmen-stock-news-analyzer-terraform-state-bucket 
         working-directory: ./terraform
 
       - name: Save RDS endpoint
@@ -102,7 +102,7 @@ jobs:
 
       # Step 11: Copy React build files to S3
       - name: Upload React App to S3
-        run: aws s3 cp . s3://stock-news-analyzer-react-app-bucket --recursive
+        run: aws s3 cp . s3://stonkwatchmen-stock-news-analyzer-react-app-bucket --recursive
         working-directory: ./stock-news-app/build
 
   terraform_destroy:
@@ -141,7 +141,7 @@ jobs:
 
       # Step 4: Retrieve Terraform state from S3
       - name: Retrieve state
-        run: aws s3 cp s3://stock-news-analyzer-terraform-state-bucket/terraform.tfstate .
+        run: aws s3 cp s3://stonkwatchmne-stock-news-analyzer-terraform-state-bucket/terraform.tfstate .
         working-directory: ./terraform
 
       # Step 5: Initialize terraform working directory

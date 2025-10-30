@@ -6,7 +6,7 @@ provider "aws" {
 
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "stock-news-analyzer-terraform-state-bucket"
+    bucket = "stonkwatchmen-stock-news-analyzer-terraform-state-bucket"
     force_destroy = true
 
     tags = {
@@ -16,7 +16,7 @@ resource "aws_s3_bucket" "terraform_bucket" {
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-    bucket = "stock-news-analyzer-react-app-bucket"
+    bucket = "stonkwatchmen-stock-news-analyzer-react-app-bucket"
     force_destroy = true
 
     tags = {
@@ -34,6 +34,8 @@ resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
   error_document {
     key = "error.html"
   }
+
+  depends_on = [ aws_s3_bucket.react_bucket ]
 }
 
 resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" {
