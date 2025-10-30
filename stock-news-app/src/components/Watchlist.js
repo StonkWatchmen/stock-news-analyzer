@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useState} from "react";
 import {getWatchlist, saveWatchlist } from "../utils/storage";
 
-const TICKER_REGEX = /^[A-Z.-]{1,10}$/;    // Allows patterns like BRK.B, RDS.A, etc.
+const TICKER_REGEX = /^[A-Z.-]{1,10}$/;    // Allows ticker patterns like BRK.B, RDS.A, etc.
 
 export default function Watchlist() {
     // Track ticker list, input value, and user error message. 
