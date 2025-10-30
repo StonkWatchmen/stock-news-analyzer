@@ -5,6 +5,15 @@ on:
   # Manual trigger using GitHub Actions UI
   workflow_dispatch:
     inputs:
+      target:
+        description: "Whose account to deploy to"
+        required: true
+        type: choice
+        options:
+          - AYG
+          - Danny
+          - Jason Chi
+          - Varun
       # Input parameter to choose between apply or destroy actions
       action:
         description: 'Terraform Action to Perform'
@@ -21,6 +30,7 @@ jobs:
     if: ${{ github.event.inputs.action == 'Terraform_apply' }}
     # Specifies the type of runner to use
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target }}
 
     env:
       # Using GitHub secrets for sensitive values
