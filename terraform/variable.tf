@@ -3,10 +3,7 @@ variable "project_name" {
   default = "stock-news-analyzer"
 }
 
-variable "alpha_vantage_api_key" {
-  type = string
-  sensitive = true
-}
+
 
 variable "db_username" {
   type      = string
