@@ -49,6 +49,7 @@ resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
 
   policy = data.aws_iam_policy_document.get_object_iam_policy.json
+  depends_on = [aws_s3_bucket_public_access_block.react_bucket_public_access_block]
 }
 
 # RDS Instance
