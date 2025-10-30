@@ -75,6 +75,21 @@ jobs:
         run: aws s3 cp terraform.tfstate s3://stock-news-analyzer-terraform-state-bucket 
         working-directory: ./terraform
 
+      - name: Save RDS endpoint
+        run: echo "RDS_ENDPOINT=$(terraform output -raw rds_endpoint)" >> $GITHUB_ENV
+        working-directory: ./terraform
+
+      - name: Install MySQL client
+        run: sudo apt-get install -y mysql-client
+
+      - name: Initialize database schema
+        env:
+          RDS_ENDPOINT: ${{ env.RDS_ENDPOINT }}
+          DB_USER: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{secrets.DB_USERNAME}}
+        run: mysql -h $RDS_ENDPOINT -u$DB_USER -p$DB_PASSWORD stocknewsanalyzerdb < init.sql
+        working-directory: ./scripts
+
       # Step 9: Install npm
       - name: Install npm
         run: npm install
