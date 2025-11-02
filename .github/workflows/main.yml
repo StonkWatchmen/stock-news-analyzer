@@ -106,6 +106,7 @@ jobs:
     if: ${{ github.event.inputs.action == 'Terraform_destroy' }}
     # Specifies the type of runner to use
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.target }}
 
     env:
       # Using GitHub secrets for sensitive values
