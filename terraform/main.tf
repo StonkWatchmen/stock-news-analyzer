@@ -11,7 +11,7 @@ resource "random_id" "unique_tag" {
 
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "stock-news-analyzer-terraform-state-bucket-${random_id.unique_tag.hex}"
+    bucket = "stock-news-analyzer-terraform-state-bucket-${var.environment}"
     force_destroy = true
 
     tags = {
@@ -21,7 +21,7 @@ resource "aws_s3_bucket" "terraform_bucket" {
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-    bucket = "stock-news-analyzer-react-app-bucket-${random_id.unique_tag.hex}"
+    bucket = "stock-news-analyzer-react-app-bucket-${var.environment}"
     force_destroy = true
 
     tags = {

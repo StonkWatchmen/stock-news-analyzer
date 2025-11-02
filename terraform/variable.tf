@@ -7,3 +7,8 @@ variable "db_password" {
   type      = string
   sensitive = true
 }
+
+variable "environment" {
+  description = "Github environment name for s3 buckets"
+  type        = string
+}
