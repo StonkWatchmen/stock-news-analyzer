@@ -4,9 +4,14 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# Random tag for S3 bucket names
+resource "random_id" "unique_tag" {
+  byte_length = 8
+}
+
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "stock-news-analyzer-terraform-state-bucket"
+    bucket = "stock-news-analyzer-terraform-state-bucket-${random_id.unique_tag.hex}"
     force_destroy = true
 
     tags = {
@@ -16,7 +21,7 @@ resource "aws_s3_bucket" "terraform_bucket" {
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-    bucket = "stock-news-analyzer-react-app-bucket"
+    bucket = "stock-news-analyzer-react-app-bucket-${random_id.unique_tag.hex}"
     force_destroy = true
 
     tags = {
