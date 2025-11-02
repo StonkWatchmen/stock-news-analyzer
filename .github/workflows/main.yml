@@ -10,7 +10,7 @@ on:
         required: true
         type: choice
         options:
-          - AYG
+          - aygbutlowercase
           - Danny
           - Jason Chi
           - Varun
