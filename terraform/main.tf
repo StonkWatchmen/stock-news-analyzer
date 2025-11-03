@@ -61,6 +61,7 @@ resource "aws_lambda_function" "lambda_function" {
 resource "aws_lambda_function_url" "lambda_url" {
   function_name      = aws_lambda_function.lambda_function.function_name
   authorization_type = "NONE"
+
   cors {
     allow_origins = ["*"]
     allow_methods = ["GET", "POST"]
@@ -71,25 +72,30 @@ resource "aws_lambda_function_url" "lambda_url" {
 
 # S3 Buckets
 ###############################################
-# S3 Bucket to store Terraform state
+
+resource "random_string" "suffix" {
+  length  = 6
+  upper   = false
+  special = false
+}
+data "aws_caller_identity" "me" {}
+locals {
+  bucket_suffix = "${terraform.workspace}-${substr(data.aws_caller_identity.me.account_id, -6)}-${random_string.suffix.result}"
+}
+
 
 resource "aws_s3_bucket" "terraform_bucket" {
-  bucket        = "stock-news-analyzer-terraform-state-bucket-${var.environment}"
+  bucket        = "stock-news-analyzer-tfstate-${local.bucket_suffix}"
   force_destroy = true
-
-  tags = {
-    Name = "Stock News Analyzer Terraform State Bucket"
-  }
+  tags = { Name = "Stock News Analyzer Terraform State Bucket" }
 }
-# S3 Bucket to host static website
+
 resource "aws_s3_bucket" "react_bucket" {
-  bucket        = "stock-news-analyzer-react-app-bucket-${var.environment}"
+  bucket        = "stock-news-analyzer-react-${local.bucket_suffix}"
   force_destroy = true
-
-  tags = {
-    Name = "Stock News Analyzer React App Bucket"
-  }
+  tags = { Name = "Stock News Analyzer React App Bucket" }
 }
+
 
 # S3 Bucket Website Configuration
 resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
