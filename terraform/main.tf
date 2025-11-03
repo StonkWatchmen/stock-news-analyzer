@@ -73,27 +73,31 @@ resource "aws_lambda_function_url" "lambda_url" {
 # S3 Buckets
 ###############################################
 
+
+data "aws_caller_identity" "me" {}
+
 resource "random_string" "suffix" {
   length  = 6
   upper   = false
   special = false
 }
-data "aws_caller_identity" "me" {}
-locals {
-  bucket_suffix = "${terraform.workspace}-${substr(data.aws_caller_identity.me.account_id, -6)}-${random_string.suffix.result}"
-}
 
+locals {
+
+  acct_last6    = substr(data.aws_caller_identity.me.account_id, length(data.aws_caller_identity.me.account_id) - 6, 6)
+  bucket_suffix = "${terraform.workspace}-${local.acct_last6}-${random_string.suffix.result}"
+}
 
 resource "aws_s3_bucket" "terraform_bucket" {
   bucket        = "stock-news-analyzer-tfstate-${local.bucket_suffix}"
   force_destroy = true
-  tags = { Name = "Stock News Analyzer Terraform State Bucket" }
+  tags          = { Name = "Stock News Analyzer Terraform State Bucket" }
 }
 
 resource "aws_s3_bucket" "react_bucket" {
   bucket        = "stock-news-analyzer-react-${local.bucket_suffix}"
   force_destroy = true
-  tags = { Name = "Stock News Analyzer React App Bucket" }
+  tags          = { Name = "Stock News Analyzer React App Bucket" }
 }
 
 

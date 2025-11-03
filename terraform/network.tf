@@ -2,14 +2,12 @@
 # Create a VPC, subnets, and related networking infrastructure for Stock News Analyzer.
 
 # VPC
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
+resource "aws_vpc" "stock_news_analyzer_vpc" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+  tags = {
+    Name = "Stock News Analyzer VPC"
   }
 }
 
