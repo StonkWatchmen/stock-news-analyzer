@@ -14,5 +14,5 @@ variable "environment" {
 }
 
 locals {
-  env_tag_safe = regexreplace(var.environment, "[^\\p{L}\\p{N} _.:/=+\\-@]", "-")
+  env_tag_safe = var.environment
 }
