@@ -5,7 +5,7 @@ def lambda_handler(event, context):
     print("Received event:", json.dumps(event))
 
     # Extract message from the event
-    message = event.get('message', 'Stonks!')
+    message = event.get('message', 'Stocks new analyzer')
 
     # Create a response
     response = {

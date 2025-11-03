@@ -1,5 +1,5 @@
 resource "aws_security_group" "rds_sg" {
-  name_prefix = "stock-news-analyzer-rds-"   # instead of fixed name
+  name_prefix = "stock-news-analyzer-rds-" # instead of fixed name
   description = "RDS access"
   vpc_id      = data.aws_vpc.default.id
 
@@ -19,7 +19,7 @@ resource "aws_security_group" "rds_sg" {
   }
 
   lifecycle {
-    create_before_destroy = true   # safer on renames
+    create_before_destroy = true # safer on renames
   }
 
   tags = {
