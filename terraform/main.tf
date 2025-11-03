@@ -135,18 +135,6 @@ resource "aws_s3_bucket_policy" "react_bucket_policy" {
 }
 
 ######################################################
-#Networking for RDS (Default VPC + Security Group)
-
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-}
 
 # Security Group for RDS
 data "http" "my_ip" {
