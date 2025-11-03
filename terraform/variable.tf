@@ -12,3 +12,7 @@ variable "environment" {
   description = "Github environment name for s3 buckets"
   type        = string
 }
+
+locals {
+  env_tag_safe = regexreplace(var.environment, "[^\\p{L}\\p{N} _.:/=+\\-@]", "-")
+}
