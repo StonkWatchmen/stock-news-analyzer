@@ -12,7 +12,7 @@ on:
         options:
           - aygbutlowercase
           - Danny
-          - Jason Chi
+          - jasonchilowercase
           - Varun
       # Input parameter to choose between apply or destroy actions
       action:
