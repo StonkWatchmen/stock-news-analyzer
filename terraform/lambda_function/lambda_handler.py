@@ -1,7 +1,6 @@
 import os, json, base64, time
 from datetime import datetime, timezone
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+import pymysql
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -17,14 +16,9 @@ def _resp(code, obj):
     return {"statusCode": code, "headers": CORS_HEADERS, "body": json.dumps(obj)}
 
 def _parse_body(event):
-    """
-    Supports:
-      - API Gateway proxy: {"body": "...", "isBase64Encoded": bool}
-      - Direct invoke: the payload dict itself
-    """
+    # Supports both API Gateway and direct test invocation
     if isinstance(event, dict) and "body" not in event:
-        return event  # direct invoke with a dict payload
-
+        return event
     body = event.get("body")
     if body is None:
         return {}
@@ -35,89 +29,97 @@ def _parse_body(event):
     except Exception:
         return {}
 
-def _get_clients():
-    table_name = os.getenv("TABLE_NAME")
-    if not table_name:
-        raise RuntimeError("Missing TABLE_NAME environment variable")
-    use_comprehend = os.getenv("USE_COMPREHEND", "true").lower() == "true"
-    region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
+def _get_conn():
+    return pymysql.connect(
+        host=os.environ["DB_HOST"],
+        port=int(os.environ.get("DB_PORT", "3306")),
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASS"],
+        database=os.environ["DB_NAME"],
+        autocommit=True,
+        cursorclass=pymysql.cursors.DictCursor,
+        connect_timeout=5,
+    )
 
-    dynamodb = boto3.resource("dynamodb", region_name=region)
-    table = dynamodb.Table(table_name)
-    comprehend = None
-    if use_comprehend:
-        comprehend = boto3.client("comprehend", region_name=region)
-    return table, comprehend, use_comprehend
+_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS news_analysis (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  symbol VARCHAR(16) NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  title VARCHAR(255) NULL,
+  content TEXT NOT NULL,
+  sentiment VARCHAR(16) NULL,
+  sentiment_pos DECIMAL(10,6) NULL,
+  sentiment_neg DECIMAL(10,6) NULL,
+  sentiment_neu DECIMAL(10,6) NULL,
+  sentiment_mix DECIMAL(10,6) NULL,
+  entities TEXT NULL,
+  ts BIGINT NOT NULL,
+  INDEX idx_symbol_created (symbol, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+"""
 
-def _analyze(text, comprehend, use_comprehend):
-    if not (use_comprehend and comprehend and text and text.strip()):
-        return {"sentiment": None, "scores": None, "entities": []}
+def _ensure_schema(conn):
+    with conn.cursor() as cur:
+        cur.execute(_SCHEMA_SQL)
 
-    t = text[:4500]  # keep well under Comprehend limits
-    try:
-        s = comprehend.detect_sentiment(Text=t, LanguageCode="en")
-        e = comprehend.detect_entities(Text=t, LanguageCode="en")
-        return {
-            "sentiment": s.get("Sentiment"),
-            "scores": s.get("SentimentScore"),
-            "entities": [x.get("Text") for x in e.get("Entities", []) if x.get("Text")]
-        }
-    except (ClientError, BotoCoreError, Exception) as ce:
-        # Log but don't fail the request
-        print("Comprehend error:", repr(ce))
-        return {"sentiment": None, "scores": None, "entities": []}
+def _analyze(text):
+    # Stub for now—plug Comprehend back in later if desired
+    return {"sentiment": None, "scores": None, "entities": []}
 
 def lambda_handler(event, context):
+    method = (event.get("requestContext", {}).get("http", {}).get("method")
+              or event.get("httpMethod") or "GET")
+
+    if method == "OPTIONS":
+        return _resp(200, {"ok": True})
+
+    if method == "GET":
+        return _resp(200, {"ok": True, "message": "POST JSON to /analyze with {symbol,title,content}"})
+
+    b = _parse_body(event)
+    symbol  = (b.get("symbol") or "UNKNOWN").upper()
+    title   = b.get("title")
+    content = (b.get("content") or "").strip()
+    if not content:
+        return _resp(400, {"error": "content is required"})
+
+    analysis = _analyze(content)
+    created  = _now_iso()
+    ts       = int(time.time())
+
+    sp = sn = sneu = smix = None
+    if isinstance(analysis.get("scores"), dict):
+        sp   = analysis["scores"].get("Positive")
+        sn   = analysis["scores"].get("Negative")
+        sneu = analysis["scores"].get("Neutral")
+        smix = analysis["scores"].get("Mixed")
+
+    entities = ",".join(analysis.get("entities") or [])
+
     try:
-        method = (event.get("requestContext", {}).get("http", {}).get("method")
-                  or event.get("httpMethod") or "GET")
-
-        # CORS preflight
-        if method == "OPTIONS":
-            return _resp(200, {"ok": True})
-
-        if method == "GET":
-            return _resp(200, {"ok": True, "message": "POST JSON to /analyze with {symbol,title,content}"})
-
-        table, comprehend, use_comprehend = _get_clients()
-
-        b = _parse_body(event)
-        symbol  = (b.get("symbol") or "UNKNOWN").upper()
-        title   = b.get("title")
-        content = (b.get("content") or "").strip()
-
-        if not content:
-            return _resp(400, {"error": "content is required"})
-
-        analysis = _analyze(content, comprehend, use_comprehend)
-
-        item = {
-            # DynamoDB keys — must match your schema
-            "symbol": symbol,            # PK (S)
-            "created_at": _now_iso(),    # SK (S)
-
-            # Attributes
-            "title": title,
-            "content": content[:2000],
-            "sentiment": analysis["sentiment"],
-            "sentiment_scores": analysis["scores"],
-            "entities": analysis["entities"],
-            "ts": int(time.time())
-        }
-
-        table.put_item(Item=item)
-
-        return _resp(201, {
-            "ok": True,
-            "symbol": symbol,
-            "sentiment": analysis["sentiment"],
-            "entities": analysis["entities"]
-        })
-
-    except (ClientError, BotoCoreError) as aws_err:
-        # Useful error surface when IAM/table issues occur
-        print("AWS client error:", repr(aws_err))
-        return _resp(500, {"error": "aws_client_error"})
+        conn = _get_conn()
+        _ensure_schema(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO news_analysis
+                  (symbol, created_at, title, content, sentiment,
+                   sentiment_pos, sentiment_neg, sentiment_neu, sentiment_mix,
+                   entities, ts)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (symbol, created, title, content[:2000], analysis["sentiment"],
+                 sp, sn, sneu, smix, entities, ts)
+            )
+        conn.close()
     except Exception as e:
-        print("Unhandled error:", repr(e))
-        return _resp(500, {"error": "internal_error"})
+        print("DB error:", repr(e))
+        return _resp(500, {"error": "db_error"})
+
+    return _resp(201, {
+        "ok": True,
+        "symbol": symbol,
+        "sentiment": analysis["sentiment"],
+        "entities": analysis.get("entities", [])
+    })

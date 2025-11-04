@@ -33,36 +33,23 @@ resource "aws_iam_role_policy_attachment" "comprehend_access" {
   policy_arn = "arn:aws:iam::aws:policy/ComprehendFullAccess"
 }
 
-
-#DyanmoDB Write Access Policy & Attachment
-data "aws_iam_policy_document" "ddb_write_doc" {
-  statement {
-    actions   = ["dynamodb:PutItem"]
-    resources = [aws_dynamodb_table.stock_news_table.arn]
-  }
-}
-
-resource "aws_iam_policy" "ddb_write" {
-  name   = "stock-news-analyzer-ddb-write-${var.environment}"
-  policy = data.aws_iam_policy_document.ddb_write_doc.json
-}
-
-resource "aws_iam_role_policy_attachment" "ddb_write_attach" {
+resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
   role       = aws_iam_role.iam_for_lambda.name
-  policy_arn = aws_iam_policy.ddb_write.arn
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
+
+
 
 
 
 data "archive_file" "name" {
   type        = "zip"
-  source_file = "${path.module}/lambda_function/lambda_handler.py"
+  source_dir  = "${path.module}/lambda_function"
   output_path = "${path.module}/lambda.zip"
 }
 
 
 # Lambda Function & Public URL
-
 resource "aws_lambda_function" "lambda_function" {
   filename         = data.archive_file.name.output_path
   function_name    = "stock_news_analyzer_lambda"
@@ -73,20 +60,23 @@ resource "aws_lambda_function" "lambda_function" {
   timeout          = 15
   architectures    = ["x86_64"]
 
-
-
   # Environment variables used by Lambda code
   environment {
     variables = {
-      TABLE_NAME     = aws_dynamodb_table.stock_news_table.name
+      DB_HOST        = aws_db_instance.stock_news_analyzer_db.address
+      DB_PORT        = "3306"
+      DB_USER        = var.db_username
+      DB_PASS        = var.db_password
+      DB_NAME        = "stocknewsanalyzerdb"
       USE_COMPREHEND = "true"
     }
   }
-  depends_on = [
-    aws_iam_role_policy_attachment.lambda_logs,
-    aws_iam_role_policy_attachment.comprehend_access,
-    aws_iam_role_policy_attachment.ddb_write_attach
-  ]
+
+  vpc_config {
+
+    subnet_ids         = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.subnet_ids
+    security_group_ids = [aws_security_group.lambda_sg.id]
+  }
 
 
 }
@@ -105,28 +95,6 @@ resource "aws_lambda_function_url" "lambda_url" {
 
 
 
-########################################
-# DYNAMODB TABLE
-########################################
-
-resource "aws_dynamodb_table" "stock_news_table" {
-  name         = "stock-news-analyzer-table-${var.environment}"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "symbol"
-  range_key    = "created_at"
-
-  attribute {
-    name = "symbol"
-    type = "S"
-  }
-  attribute {
-    name = "created_at"
-    type = "S"
-  }
-  tags = { Name = "Stock News Analyzer Table" }
-}
-
-
 
 
 ########################################
@@ -140,7 +108,7 @@ resource "aws_apigatewayv2_api" "http_api" {
 resource "aws_apigatewayv2_integration" "lambda_integration" {
   api_id                 = aws_apigatewayv2_api.http_api.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.lambda_function.arn
+  integration_uri        = aws_lambda_function.lambda_function.invoke_arn
   payload_format_version = "2.0"
 }
 
