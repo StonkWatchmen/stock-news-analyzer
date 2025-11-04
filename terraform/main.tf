@@ -129,18 +129,27 @@ resource "aws_dynamodb_table" "stock_news_table" {
 
 
 
-
+########################################
 # API Gateway for Lambda Function
 resource "aws_apigatewayv2_api" "http_api" {
   name          = "stock-news-analyzer-api-${var.environment}"
   protocol_type = "HTTP"
 }
 
+# API Gateway Integration with Lambda
 resource "aws_apigatewayv2_integration" "lambda_integration" {
   api_id                 = aws_apigatewayv2_api.http_api.id
   integration_type       = "AWS_PROXY"
   integration_uri        = aws_lambda_function.lambda_function.arn
   payload_format_version = "2.0"
+}
+
+
+# API Gateway Routes and Stage
+resource "aws_apigatewayv2_route" "get_root" {
+  api_id    = aws_apigatewayv2_api.http_api.id
+  route_key = "GET /"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
 resource "aws_apigatewayv2_route" "post_analyze" {
@@ -149,12 +158,14 @@ resource "aws_apigatewayv2_route" "post_analyze" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.http_api.id
   name        = "$default"
   auto_deploy = true
 }
 
+# Permission for API Gateway to invoke Lambda
 resource "aws_lambda_permission" "allow_apigw_invoke" {
   statement_id  = "AllowApiGwInvoke"
   action        = "lambda:InvokeFunction"
@@ -202,6 +213,7 @@ resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
   }
 }
 
+# IAM Policy for S3 Bucket Public Read Access
 resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" {
   bucket = aws_s3_bucket.react_bucket.id
 
@@ -214,7 +226,7 @@ resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" 
 
 
 
-
+# IAM Policy Document to allow public read access to S3 bucket objects
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
 
@@ -234,7 +246,6 @@ locals {
 }
 
 # RDS Instance
-
 resource "aws_db_instance" "stock_news_analyzer_db" {
   identifier             = "stock-news-analyzer-db"
   allocated_storage      = 20
