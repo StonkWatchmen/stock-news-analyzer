@@ -50,6 +50,13 @@ function SignUp() {
         </button>
       </form>
 
+      <p className="auth-link-text">
+        Have an account already?{" "}
+        <Link to="/signin" className="auth-link">
+          Sign In
+        </Link>
+      </p>
+
       {message && <div className="auth-message">{message}</div>}
     </div>
   );
