@@ -11,9 +11,17 @@ import {
   
   export const userPool = new CognitoUserPool(poolData);
   
+ 
   export function signUp(email, password) {
     return new Promise((resolve, reject) => {
-      userPool.signUp(email, password, [], null, (err, result) => {
+      const attributeList = [
+        new CognitoUserAttribute({
+          Name: "email",
+          Value: email
+        })
+      ];
+
+      userPool.signUp(email, password, attributeList, null, (err, result) => {
         if (err) reject(err);
         else resolve(result);
       });

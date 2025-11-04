@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
-import { userPool } from "../cognito";
+import { userPool } from "../Cognito";
 import { useNavigate, Link } from "react-router-dom";
 import "./Auth.css";
 

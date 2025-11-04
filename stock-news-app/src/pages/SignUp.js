@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { userPool } from "../cognito";
+import { useNavigate, Link } from "react-router-dom";
+import { userPool } from "../Cognito";
 import "./Auth.css";
 
 function SignUp() {
