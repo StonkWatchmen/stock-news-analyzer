@@ -72,9 +72,9 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
 }
 
 resource "aws_instance" "db_init" {
-  ami           = data.aws_ami.amazonlinux
+  ami           = data.aws_ami.amazonlinux.id
   instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public_subnet
+  subnet_id     = aws_subnet.public_subnet.id
   
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   
