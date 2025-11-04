@@ -11,7 +11,7 @@ on:
         type: choice
         options:
           - aygbutlowercase
-          - Danny
+          - danny
           - jasonchilowercase
           - Varun
       # Input parameter to choose between apply or destroy actions
