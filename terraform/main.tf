@@ -72,36 +72,26 @@ resource "aws_lambda_function_url" "lambda_url" {
 
 # S3 Buckets
 ###############################################
-
-
-data "aws_caller_identity" "me" {}
-
-resource "random_string" "suffix" {
-  length  = 6
-  upper   = false
-  special = false
-}
-
-locals {
-
-  acct_last6    = substr(data.aws_caller_identity.me.account_id, length(data.aws_caller_identity.me.account_id) - 6, 6)
-  bucket_suffix = "${terraform.workspace}-${local.acct_last6}-${random_string.suffix.result}"
-}
-
+# S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-  bucket        = "stock-news-analyzer-tfstate-${local.bucket_suffix}"
+  bucket        = "stock-news-analyzer-terraform-state-bucket-${var.environment}"
   force_destroy = true
-  tags          = { Name = "Stock News Analyzer Terraform State Bucket" }
+
+  tags = {
+    Name = "Stock News Analyzer Terraform State Bucket"
+  }
 }
 
+# S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-  bucket        = "stock-news-analyzer-react-${local.bucket_suffix}"
+  bucket        = "stock-news-analyzer-react-app-bucket-${var.environment}"
   force_destroy = true
-  tags          = { Name = "Stock News Analyzer React App Bucket" }
+
+  tags = {
+    Name = "Stock News Analyzer React App Bucket"
+  }
 }
 
-
-# S3 Bucket Website Configuration
 resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
   bucket = aws_s3_bucket.react_bucket.id
 
@@ -112,11 +102,8 @@ resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
   error_document {
     key = "error.html"
   }
-
-  depends_on = [aws_s3_bucket.react_bucket]
 }
 
-# Disable public access block for the S3 bucket
 resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" {
   bucket = aws_s3_bucket.react_bucket.id
 
@@ -126,14 +113,9 @@ resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" 
   restrict_public_buckets = false
 }
 
-
-
-
-
-
-# Attach the policy to the S3 bucket
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
-  bucket     = aws_s3_bucket.react_bucket.id
+  bucket = aws_s3_bucket.react_bucket.id
+
   policy     = data.aws_iam_policy_document.get_object_iam_policy.json
   depends_on = [aws_s3_bucket_public_access_block.react_bucket_public_access_block]
 }
