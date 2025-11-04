@@ -76,7 +76,7 @@ resource "null_resource" "db_init" {
 
   provisioner "local-exec" {
     command = <<EOT
-      mysql -h ${aws_db_instance.stock_news_analyzer.address} -u admin -p adminadmin stocknewsanalyzerdb < ./scripts/init.sql
+      mysql -h ${aws_db_instance.stock_news_analyzer_db.address} -u admin -padminadmin stocknewsanalyzerdb < ./scripts/init.sql
     EOT
   }
 }
