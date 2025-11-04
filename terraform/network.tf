@@ -15,7 +15,11 @@ data "aws_subnets" "default" {
 
 resource "aws_db_subnet_group" "stock_news_analyzer_db_subnet_group" {
   name       = "stock_news_analyzer_db_subnet_group_default"
-  subnet_ids = slice(data.aws_subnets.default.ids, 0, 2)
+  subnet_ids = slice(
+    data.aws_subnets.default.ids,
+    0,
+    min(2, length(data.aws_subnets.default.ids))
+  )
 
   tags = {
     Name = "Stock News Analyzer DB Subnet Group - default VPC"
