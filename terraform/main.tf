@@ -70,3 +70,13 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
   vpc_security_group_ids = [aws_security_group.rds_sg.id]                     # Attach the RDS security group
   db_subnet_group_name   = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.name # Use the created subnet group
 }
+
+resource "null_resource" "db_init" {
+  depends_on = [aws_db_instance.stock_news_analyzer_db]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      mysql -h ${aws_db_instance.stock_news_analyzer.address} -u admin -p adminadmin stocknewsanalyzerdb < ./scripts/init.sql
+    EOT
+  }
+}
