@@ -1,7 +1,8 @@
 import {
     CognitoUserPool,
     CognitoUser,
-    AuthenticationDetails
+    AuthenticationDetails,
+    CognitoUserAttribute
   } from "amazon-cognito-identity-js";
   
   const poolData = {
