@@ -60,13 +60,6 @@ function ConfirmSignUp() {
         Resend Confirmation Code
       </button>
 
-      <p className="auth-link-text">
-        Already confirmed?{" "}
-        <Link to="/" className="auth-link">
-          Sign In
-        </Link>
-      </p>
-
       {message && <div className="auth-message">{message}</div>}
     </div>
   );

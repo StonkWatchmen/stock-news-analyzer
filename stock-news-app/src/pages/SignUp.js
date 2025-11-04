@@ -15,7 +15,7 @@ function SignUp() {
     signUp(email, password)
       .then(() => {
         setMessage("Sign-up successful! Please check your email to confirm.");
-        navigate("/");
+        navigate("/confirm");
       })
       .catch((err) => {
         setMessage(err.message || JSON.stringify(err));
