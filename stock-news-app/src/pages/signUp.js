@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { userPool } from "../cognito";
+import "./Auth.css";
 
 function SignUp() {
   const [email, setEmail] = useState("");
@@ -16,29 +17,41 @@ function SignUp() {
         setMessage(err.message || JSON.stringify(err));
       } else {
         setMessage("Sign-up successful! Please check your email to confirm.");
-        // Optionally, redirect to SignIn page
         navigate("/");
       }
     });
   };
 
   return (
-    <form onSubmit={handleSignUp}>
-    <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-    />
-    <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-    />
-    <button type="submit">Sign Up</button>
-        {message && <p>{message}</p>}
-    </form>
+    <div className="auth-container">
+      <h1 className="auth-title">Create Account</h1>
+
+      <form className="auth-form" onSubmit={handleSignUp}>
+        <input
+          type="email"
+          placeholder="Email"
+          className="auth-input"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          className="auth-input"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+
+        <button type="submit" className="auth-btn">
+          Sign Up
+        </button>
+      </form>
+
+      {message && <div className="auth-message">{message}</div>}
+    </div>
   );
 }
 

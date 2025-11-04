@@ -1,0 +1,115 @@
+:root {
+    --bg: #0e1117;
+    --surface: #161b22;
+    --surface-hover: #1c222b;
+    --border: #30363d;
+    --accent: #00c46b;
+    --accent-hover: #00e07b;
+    --danger: #f85149;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  
+  html, body, #root {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    margin: 0;
+  }
+  
+  .auth-container {
+    max-width: 420px;
+    margin: 80px auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 32px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  
+  .auth-container:hover {
+    background: var(--surface-hover);
+    transform: translateY(-2px);
+  }
+  
+  .auth-title {
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--accent);
+    text-align: center;
+    margin-bottom: 24px;
+    text-shadow: 0 0 12px rgba(0, 196, 107, 0.3);
+  }
+  
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  
+  .auth-input {
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-hover);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .auth-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 6px rgba(0, 196, 107, 0.3);
+  }
+  
+  .auth-input::placeholder {
+    color: var(--muted);
+  }
+  
+  .auth-btn {
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+  
+  .auth-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.03);
+  }
+  
+  .auth-message {
+    margin-top: 16px;
+    font-size: 14px;
+    color: var(--danger);
+    text-align: center;
+  }
+  
+  .auth-link-text {
+    text-align: center;
+    color: var(--muted);
+    margin-top: 18px;
+    font-size: 14px;
+  }
+  
+  .auth-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  
+  .auth-link:hover {
+    text-decoration: underline;
+  }
+  
