@@ -1,7 +1,12 @@
 import React from "react";
+import Watchlist from "./Watchlist";
 
 function Dashboard() {
-  return <h1>Welcome to your dashboard!</h1>;
+  return (
+    <div>
+      <Watchlist />
+    </div>
+  );
 }
 
 export default Dashboard;
