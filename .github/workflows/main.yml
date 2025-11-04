@@ -76,6 +76,7 @@ jobs:
           echo "REACT_APP_COGNITO_USER_POOL_ID=$(terraform output -raw cognito_user_pool_id)" >> $GITHUB_ENV
           echo "REACT_APP_COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
           echo "REACT_APP_COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
+        working-directory: ./terraform
 
       # Step 8: Store Terraform state in S3
       - name: Store state 
