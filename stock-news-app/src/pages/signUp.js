@@ -1,7 +1,7 @@
 // SignUp.js
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { userPool } from "./userPool";
+import { userPool } from "../cognito";
 
 function SignUp() {
   const [email, setEmail] = useState("");
