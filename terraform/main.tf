@@ -1,17 +1,16 @@
 # Provider Configuration
 # Specifies the AWS provider and region for Terraform to manage resources in.
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
 }
 
-# Random tag for S3 bucket names
-resource "random_id" "unique_tag" {
-  byte_length = 8
+locals {
+  project_name = "stock-news-analyzer"
 }
 
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "stock-news-analyzer-terraform-state-bucket-${var.environment}"
+    bucket = "${local.project_name}-terraform-state-bucket-${var.environment}"
     force_destroy = true
 
     tags = {
@@ -21,7 +20,7 @@ resource "aws_s3_bucket" "terraform_bucket" {
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-    bucket = "stock-news-analyzer-react-app-bucket-${var.environment}"
+    bucket = "${local.project_name}-react-app-bucket-${var.environment}"
     force_destroy = true
 
     tags = {
@@ -39,6 +38,8 @@ resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
   error_document {
     key = "error.html"
   }
+
+  depends_on = [ aws_s3_bucket.react_bucket ]
 }
 
 resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" {
@@ -59,7 +60,7 @@ resource "aws_s3_bucket_policy" "react_bucket_policy" {
 
 # RDS Instance
 resource "aws_db_instance" "stock_news_analyzer_db" {
-  identifier             = "stock-news-analyzer-db"                           # Unique identifier for the RDS instance
+  identifier             = "${local.project_name}-db"                           # Unique identifier for the RDS instance
   allocated_storage      = 20                                                 # 20GB of storage
   storage_type           = "gp2"                                              # General Purpose SSD
   engine                 = "mysql"                                            # MySQL database engine
@@ -72,4 +73,108 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
   skip_final_snapshot    = true                                               # Skip final snapshot when destroying the database
   vpc_security_group_ids = [aws_security_group.rds_sg.id]                     # Attach the RDS security group
   db_subnet_group_name   = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.name # Use the created subnet group
+}
+
+resource "aws_instance" "db_init" {
+  ami           = data.aws_ami.amazonlinux.id
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.public_subnet.id
+  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+  associate_public_ip_address = true
+  depends_on = [ aws_db_instance.stock_news_analyzer_db ]
+  
+  user_data = <<-EOF
+    #!/bin/bash
+    yum install -y mysql
+    
+    mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
+          -u ${var.db_username} \
+          -p${var.db_password} \
+          stocknewsanalyzerdb << 'MYSQL'
+    
+    DROP TABLE IF EXISTS watchlist;
+    DROP TABLE IF EXISTS users;
+    DROP TABLE IF EXISTS stocks;
+
+    CREATE TABLE users (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL, 
+        username VARCHAR(16) NOT NULL,
+        password VARCHAR(128) NOT NULL,
+        phone_number VARCHAR(10)
+    );
+
+    CREATE TABLE stocks (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+        ticker VARCHAR(5) NOT NULL
+    );
+
+    CREATE TABLE watchlist (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+        user_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (stock_id) REFERENCES stocks(id)
+    );
+
+    INSERT INTO stocks(ticker) 
+    VALUES
+        ('AAPL'),
+        ('NFLX'),
+        ('AMZN'),
+        ('NVDA'),
+        ('META'),
+        ('MSFT'),
+        ('AMD');
+    MYSQL
+  EOF
+
+  tags = {
+    Name = "db-init"
+  }
+}
+
+resource "aws_cognito_user_pool" "user_pool" {
+  name = "${local.project_name}-user-pool"
+
+  auto_verified_attributes = ["email"]
+
+  password_policy {
+    minimum_length    = 8
+    require_lowercase = true
+    require_numbers   = true
+    require_symbols   = false
+    require_uppercase = true
+  }
+
+  account_recovery_setting {
+    recovery_mechanism {
+      name     = "verified_email"
+      priority = 1
+    }
+  }
+}
+resource "aws_cognito_user_pool_client" "web_client" {
+  name         = "${local.project_name}-client"
+  user_pool_id = aws_cognito_user_pool.user_pool.id
+  generate_secret = false
+
+  explicit_auth_flows = [
+    "ALLOW_USER_SRP_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_PASSWORD_AUTH"
+  ]
+
+  callback_urls = [
+    "https://${aws_s3_bucket.react_bucket.bucket}.s3-website-${var.aws_region}.amazonaws.com"
+  ]
+
+  logout_urls = [
+    "https://${aws_s3_bucket.react_bucket.bucket}.s3-website-${var.aws_region}.amazonaws.com"
+  ]
+
+  supported_identity_providers = ["COGNITO"]
+}
+resource "aws_cognito_user_pool_domain" "auth_domain" {
+  domain       = local.project_name
+  user_pool_id = aws_cognito_user_pool.user_pool.id
 }
