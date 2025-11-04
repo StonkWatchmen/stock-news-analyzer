@@ -79,7 +79,6 @@ resource "aws_lambda_function" "lambda_function" {
   environment {
     variables = {
       TABLE_NAME     = aws_dynamodb_table.stock_news_table.name
-      AWS_REGION     = "us-east-1"
       USE_COMPREHEND = "true"
     }
   }
