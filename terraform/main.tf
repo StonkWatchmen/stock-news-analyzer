@@ -5,12 +5,12 @@ provider "aws" {
 }
 
 locals {
-  project_name = "stonkwatchmen-stock-news-analyzer"
+  project_name = "stock-news-analyzer"
 }
 
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "${local.project_name}-terraform-state-bucket"
+    bucket = "${local.project_name}-terraform-state-bucket-${var.environment}"
     force_destroy = true
 
     tags = {
@@ -20,7 +20,7 @@ resource "aws_s3_bucket" "terraform_bucket" {
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-    bucket = "${local.project_name}-react-app-bucket"
+    bucket = "${local.project_name}-react-app-bucket-${var.environment}"
     force_destroy = true
 
     tags = {
@@ -60,7 +60,7 @@ resource "aws_s3_bucket_policy" "react_bucket_policy" {
 
 # RDS Instance
 resource "aws_db_instance" "stock_news_analyzer_db" {
-  identifier             = "stock-news-analyzer-db"                           # Unique identifier for the RDS instance
+  identifier             = "${local.project_name}-db"                           # Unique identifier for the RDS instance
   allocated_storage      = 20                                                 # 20GB of storage
   storage_type           = "gp2"                                              # General Purpose SSD
   engine                 = "mysql"                                            # MySQL database engine

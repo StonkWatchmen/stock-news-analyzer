@@ -11,3 +11,8 @@ variable "db_password" {
 variable "aws_region" {
   type = string
 }
+
+variable "environment" {
+  description = "Github environment name for s3 buckets"
+  type        = string
+}
