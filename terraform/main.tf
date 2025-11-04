@@ -71,12 +71,60 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
   db_subnet_group_name   = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.name # Use the created subnet group
 }
 
-resource "null_resource" "db_init" {
-  depends_on = [aws_db_instance.stock_news_analyzer_db]
+resource "aws_instance" "db_init" {
+  ami           = data.aws_ami.amazonlinux
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.public_subnet
+  
+  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+  
+  user_data = <<-EOF
+    #!/bin/bash
+    yum install -y mysql
+    
+    mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
+          -u admin \
+          -p${var.db_password} \
+          stocknewsanalyzerdb << 'MYSQL'
+    
+    DROP TABLE IF EXISTS watchlist;
+    DROP TABLE IF EXISTS users;
+    DROP TABLE IF EXISTS stocks;
 
-  provisioner "local-exec" {
-    command = <<EOT
-      mysql -h ${aws_db_instance.stock_news_analyzer_db.address} -u admin -padminadmin stocknewsanalyzerdb < ./scripts/init.sql
-    EOT
+    CREATE TABLE users (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL, 
+        username VARCHAR(16) NOT NULL,
+        password VARCHAR(128) NOT NULL,
+        phone_number VARCHAR(10)
+    );
+
+    CREATE TABLE stocks (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+        ticker VARCHAR(5) NOT NULL
+    );
+
+    CREATE TABLE watchlist (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+        user_id INTEGER NOT NULL,
+        stock_id INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (stock_id) REFERENCES stocks(id)
+    );
+
+    INSERT INTO stocks(ticker) 
+    VALUES
+        ('AAPL'),
+        ('NFLX'),
+        ('AMZN'),
+        ('NVDA'),
+        ('META'),
+        ('MSFT'),
+        ('AMD');
+    
+    MYSQL
+  EOF
+  
+  tags = {
+    Name = "db-init"
   }
 }
