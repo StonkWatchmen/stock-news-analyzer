@@ -44,7 +44,7 @@ import {
     return new Promise((resolve, reject) => {
       const user = new CognitoUser({ Username: email, Pool: userPool });
 
-      user.confirmRegistration(codetrue, (err, result) => {
+      user.confirmRegistration(code, true, (err, result) => {
         if (err) reject(err);
         else resolve(result);
       });
