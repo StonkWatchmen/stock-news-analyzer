@@ -52,7 +52,7 @@ function SignUp() {
 
       <p className="auth-link-text">
         Have an account already?{" "}
-        <Link to="/signin" className="auth-link">
+        <Link to="/" className="auth-link">
           Sign In
         </Link>
       </p>
