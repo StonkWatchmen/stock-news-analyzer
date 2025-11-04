@@ -1,5 +1,5 @@
 import React from "react";
-import Watchlist from "./Watchlist";
+import Watchlist from "../components/Watchlist";
 
 function Dashboard() {
   return (
