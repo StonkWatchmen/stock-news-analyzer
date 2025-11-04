@@ -9,7 +9,7 @@ import {
     ClientId: process.env.REACT_APP_COGNITO_CLIENT_ID
   };
   
-  const userPool = new CognitoUserPool(poolData);
+  export const userPool = new CognitoUserPool(poolData);
   
   export function signUp(email, password) {
     return new Promise((resolve, reject) => {
