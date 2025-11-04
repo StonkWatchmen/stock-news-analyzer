@@ -84,7 +84,7 @@ resource "aws_instance" "db_init" {
     yum install -y mysql
     
     mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-          -u admin \
+          -u ${var.db_username} \
           -p${var.db_password} \
           stocknewsanalyzerdb << 'MYSQL'
     
@@ -122,22 +122,6 @@ resource "aws_instance" "db_init" {
         ('MSFT'),
         ('AMD');
     MYSQL
-
-    echo ""
-    echo "Verifying tables..."
-    echo "-----------------------------------"
-    mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-          -u admin \
-          -p${var.db_password} \
-          stocknewsanalyzerdb -e "SHOW TABLES;"
-      
-    echo ""
-    echo "Checking stocks data..."
-    echo "-----------------------------------"
-    mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-          -u admin \
-          -p${var.db_password} \
-          stocknewsanalyzerdb -e "SELECT * FROM stocks;"
   EOF
 
   tags = {
