@@ -13,7 +13,7 @@ resource "aws_security_group" "rds_sg" {
 
 resource "aws_security_group" "ec2_sg" {
   name   = "ec2-init-sg"
-  vpc_id = data.aws_vpc.default.id
+  vpc_id = aws_vpc.stock_news_analyzer_vpc.id
   
   egress {
     from_port   = 0
