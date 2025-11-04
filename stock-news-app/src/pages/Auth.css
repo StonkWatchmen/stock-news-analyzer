@@ -113,3 +113,21 @@
     text-decoration: underline;
   }
   
+  .auth-link-btn {
+    display: block;
+    margin: 12px 0;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  
+  .auth-link-btn:hover {
+    background: rgba(0, 196, 107, 0.1);
+    transform: scale(1.02);
+  }
+  
