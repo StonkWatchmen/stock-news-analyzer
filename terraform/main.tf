@@ -1,12 +1,16 @@
 # Provider Configuration
 # Specifies the AWS provider and region for Terraform to manage resources in.
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
+}
+
+locals {
+  project_name = "stonkwatchmen-stock-news-analyzer"
 }
 
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "stonkwatchmen-stock-news-analyzer-terraform-state-bucket"
+    bucket = "${local.project_name}-terraform-state-bucket"
     force_destroy = true
 
     tags = {
@@ -16,7 +20,7 @@ resource "aws_s3_bucket" "terraform_bucket" {
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-    bucket = "stonkwatchmen-stock-news-analyzer-react-app-bucket"
+    bucket = "${local.project_name}-react-app-bucket"
     force_destroy = true
 
     tags = {
@@ -127,4 +131,50 @@ resource "aws_instance" "db_init" {
   tags = {
     Name = "db-init"
   }
+}
+
+resource "aws_cognito_user_pool" "user_pool" {
+  name = "${local.project_name}-user-pool"
+
+  auto_verified_attributes = ["email"]
+
+  password_policy {
+    minimum_length    = 8
+    require_lowercase = true
+    require_numbers   = true
+    require_symbols   = false
+    require_uppercase = true
+  }
+
+  account_recovery_setting {
+    recovery_mechanism {
+      name     = "verified_email"
+      priority = 1
+    }
+  }
+}
+resource "aws_cognito_user_pool_client" "web_client" {
+  name         = "${local.project_name}-client"
+  user_pool_id = aws_cognito_user_pool.user_pool.id
+  generate_secret = false
+
+  explicit_auth_flows = [
+    "ALLOW_USER_SRP_AUTH",
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_PASSWORD_AUTH"
+  ]
+
+  callback_urls = [
+    "https://${aws_s3_bucket.react_bucket.bucket}.s3-website-${var.aws_region}.amazonaws.com"
+  ]
+
+  logout_urls = [
+    "https://${aws_s3_bucket.react_bucket.bucket}.s3-website-${var.aws_region}.amazonaws.com"
+  ]
+
+  supported_identity_providers = ["COGNITO"]
+}
+resource "aws_cognito_user_pool_domain" "auth_domain" {
+  domain       = local.project_name
+  user_pool_id = aws_cognito_user_pool.user_pool.id
 }
