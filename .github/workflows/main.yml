@@ -55,9 +55,6 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install MySQL client
-        run: sudo apt-get install -y mysql-client
-
       # Step 5: Initialize Terraform working directory
       - name: Terraform Init
         run: terraform init
