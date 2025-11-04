@@ -124,6 +124,8 @@ resource "aws_instance" "db_init" {
     MYSQL
   EOF
   
+  depends_on = [ aws_db_instance.stock_news_analyzer_db ]
+  
   tags = {
     Name = "db-init"
   }

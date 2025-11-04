@@ -126,7 +126,7 @@ jobs:
 
       # Step 4: Retrieve Terraform state from S3
       - name: Retrieve state
-        run: aws s3 cp s3://stonkwatchmne-stock-news-analyzer-terraform-state-bucket/terraform.tfstate .
+        run: aws s3 cp s3://stonkwatchmen-stock-news-analyzer-terraform-state-bucket/terraform.tfstate .
         working-directory: ./terraform
 
       # Step 5: Initialize terraform working directory
