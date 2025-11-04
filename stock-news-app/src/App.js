@@ -1,25 +1,35 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState } from "react";
+import { signUp, signIn } from "./cognito";
 
-function App() {
+export default function App() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSignUp = async () => {
+    try {
+      await signUp(email, password);
+      alert("Check your email to verify your account!");
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleSignIn = async () => {
+    try {
+      const result = await signIn(email, password);
+      alert("Sign in successful!");
+      console.log("Session:", result);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={{ display: "flex", flexDirection: "column", width: 300, margin: "100px auto" }}>
+      <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
+      <input placeholder="Password" type="password" onChange={(e) => setPassword(e.target.value)} />
+      <button onClick={handleSignUp}>Sign Up</button>
+      <button onClick={handleSignIn}>Sign In</button>
     </div>
   );
 }
-
-export default App;
