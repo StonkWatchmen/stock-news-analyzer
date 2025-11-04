@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { userPool } from "../Cognito";
+import { signUp } from "../Cognito";
 import "./Auth.css";
 
 function SignUp() {
@@ -11,15 +11,15 @@ function SignUp() {
 
   const handleSignUp = (e) => {
     e.preventDefault();
-
-    userPool.signUp(email, password, [], null, (err, result) => {
-      if (err) {
-        setMessage(err.message || JSON.stringify(err));
-      } else {
+  
+    signUp(email, password)
+      .then(() => {
         setMessage("Sign-up successful! Please check your email to confirm.");
         navigate("/");
-      }
-    });
+      })
+      .catch((err) => {
+        setMessage(err.message || JSON.stringify(err));
+      });
   };
 
   return (
