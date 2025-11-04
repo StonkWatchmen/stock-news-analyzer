@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
-import { userPool } from "../Cognito";
+import { signIn } from "../Cognito";
 import { useNavigate, Link } from "react-router-dom";
 import "./Auth.css";
 
@@ -13,19 +12,20 @@ function SignIn() {
   const handleSignIn = (e) => {
     e.preventDefault();
 
-    const user = new CognitoUser({ Username: email, Pool: userPool });
-    const authDetails = new AuthenticationDetails({
-      Username: email,
-      Password: password,
-    });
-
-    user.authenticateUser(authDetails, {
-      onSuccess: (result) => {
+    signIn(email, password)
+      .then((result) => {
         localStorage.setItem("cognitoToken", result.getIdToken().getJwtToken());
         navigate("/dashboard");
-      },
-      onFailure: (err) => setMessage(err.message || JSON.stringify(err)),
-    });
+      })
+      .catch((err) => {
+        if (err.code === "UserNotConfirmedException") {
+          setMessage("Please confirm your email before signing in.");
+        } else if (err.code === "NotAuthorizedException") {
+          setMessage("Incorrect email or password. Please try again.");
+        } else {
+          setMessage(err.message || JSON.stringify(err));
+        }
+      });
   };
 
   return (
