@@ -75,8 +75,9 @@ resource "aws_instance" "db_init" {
   ami           = data.aws_ami.amazonlinux.id
   instance_type = "t2.micro"
   subnet_id     = aws_subnet.public_subnet.id
-  
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+  associate_public_ip_address = true
+  depends_on = [ aws_db_instance.stock_news_analyzer_db ]
   
   user_data = <<-EOF
     #!/bin/bash
@@ -123,23 +124,21 @@ resource "aws_instance" "db_init" {
     MYSQL
 
     echo ""
-      echo "Verifying tables..."
-      echo "-----------------------------------"
-      mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-            -u admin \
-            -p${var.db_password} \
-            stocknewsanalyzerdb -e "SHOW TABLES;"
+    echo "Verifying tables..."
+    echo "-----------------------------------"
+    mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
+          -u admin \
+          -p${var.db_password} \
+          stocknewsanalyzerdb -e "SHOW TABLES;"
       
-      echo ""
-      echo "Checking stocks data..."
-      echo "-----------------------------------"
-      mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-            -u admin \
-            -p${var.db_password} \
-            stocknewsanalyzerdb -e "SELECT * FROM stocks;"
+    echo ""
+    echo "Checking stocks data..."
+    echo "-----------------------------------"
+    mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
+          -u admin \
+          -p${var.db_password} \
+          stocknewsanalyzerdb -e "SELECT * FROM stocks;"
   EOF
-  
-  depends_on = [ aws_db_instance.stock_news_analyzer_db ]
 
   tags = {
     Name = "db-init"
