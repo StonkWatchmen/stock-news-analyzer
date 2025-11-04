@@ -11,9 +11,10 @@ on:
         type: choice
         options:
           - aygbutlowercase
-          - Danny
-          - Jason Chi
-          - Varun
+          - danny
+          - jasonchilowercase
+          - varun
+          - anthonyl
       # Input parameter to choose between apply or destroy actions
       action:
         description: 'Terraform Action to Perform'
@@ -37,6 +38,7 @@ jobs:
       TF_VAR_aws_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
       TF_VAR_db_username: ${{ secrets.DB_USERNAME}}
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
       ENVIRONMENT_NAME: ${{ github.event.inputs.target }}
 
     steps:
@@ -86,17 +88,29 @@ jobs:
         run: aws s3 cp terraform.tfstate s3://stock-news-analyzer-terraform-state-bucket-${{ env.ENVIRONMENT_NAME }}
         working-directory: ./terraform
 
+      - name: Get Terraform outputs
+        run: |
+          echo "REACT_APP_COGNITO_USER_POOL_ID=$(terraform output -raw cognito_user_pool_id)" >> $GITHUB_ENV
+          echo "REACT_APP_COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
+          echo "REACT_APP_COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
+        working-directory: ./terraform
+
       # Step 9: Install npm
       - name: Install npm
-        run: npm install
+        run: npm ci
         working-directory: ./stock-news-app
 
-      # Step 10: Build React app
+      # Step 10: Install dependencies
+      - name: Install Cognito Identity SDK and React Router Dom
+        run: npm install amazon-cognito-identity-js react-router-dom@6
+        working-directory: ./stock-news-app
+
+      # Step 11: Build React app
       - name: Build React App
         run: npm run build
         working-directory: ./stock-news-app
 
-      # Step 11: Copy React build files to S3
+      # Step 12: Copy React build files to S3
       - name: Upload React App to S3
         run: aws s3 cp . s3://stock-news-analyzer-react-app-bucket-${{ env.ENVIRONMENT_NAME }} --recursive
         working-directory: ./stock-news-app/build
@@ -114,6 +128,7 @@ jobs:
       TF_VAR_aws_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
       TF_VAR_db_username: ${{ secrets.DB_USERNAME}}
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
       ENVIRONMENT_NAME: ${{ github.event.inputs.target }}
 
     steps:
