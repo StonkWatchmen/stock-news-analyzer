@@ -120,12 +120,27 @@ resource "aws_instance" "db_init" {
         ('META'),
         ('MSFT'),
         ('AMD');
-    
     MYSQL
+
+    echo ""
+      echo "Verifying tables..."
+      echo "-----------------------------------"
+      mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
+            -u admin \
+            -p${var.db_password} \
+            stocknewsanalyzerdb -e "SHOW TABLES;"
+      
+      echo ""
+      echo "Checking stocks data..."
+      echo "-----------------------------------"
+      mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
+            -u admin \
+            -p${var.db_password} \
+            stocknewsanalyzerdb -e "SELECT * FROM stocks;"
   EOF
   
   depends_on = [ aws_db_instance.stock_news_analyzer_db ]
-  
+
   tags = {
     Name = "db-init"
   }
