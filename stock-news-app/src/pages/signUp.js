@@ -24,20 +24,20 @@ function SignUp() {
 
   return (
     <form onSubmit={handleSignUp}>
-      <input
+    <input
         type="email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
+    />
+    <input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-      />
-      <button type="submit">Sign Up</button>
-      {message && <p>{message}</p>}
+    />
+    <button type="submit">Sign Up</button>
+        {message && <p>{message}</p>}
     </form>
   );
 }

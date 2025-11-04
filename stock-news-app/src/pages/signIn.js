@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 import { userPool } from "../cognito";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 function SignIn() {
   const [email, setEmail] = useState("");
@@ -27,20 +27,25 @@ function SignIn() {
 
   return (
     <form onSubmit={handleSignIn}>
-      <input
+    <input
         type="email"
         placeholder="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-      />
+    />
       <input
         type="password"
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-      />
-      <button type="submit">Sign In</button>
-      {message && <p>{message}</p>}
+    />
+    <button type="submit">Sign In</button>
+
+    <p>
+        Don’t have an account? <Link to="/signup">Sign Up</Link>
+    </p>
+
+        {message && <p>{message}</p>}
     </form>
   );
 }
