@@ -33,6 +33,27 @@ resource "aws_iam_role_policy_attachment" "comprehend_access" {
   policy_arn = "arn:aws:iam::aws:policy/ComprehendFullAccess"
 }
 
+
+#DyanmoDB Write Access Policy & Attachment
+data "aws_iam_policy_document" "ddb_write_doc" {
+  statement {
+    actions   = ["dynamodb:PutItem"]
+    resources = [aws_dynamodb_table.stock_news_table.arn]
+  }
+}
+
+resource "aws_iam_policy" "ddb_write" {
+  name   = "stock-news-analyzer-ddb-write-${var.environment}"
+  policy = data.aws_iam_policy_document.ddb_write_doc.json
+}
+
+resource "aws_iam_role_policy_attachment" "ddb_write_attach" {
+  role       = aws_iam_role.iam_for_lambda.name
+  policy_arn = aws_iam_policy.ddb_write.arn
+}
+
+
+
 data "archive_file" "name" {
   type        = "zip"
   source_file = "${path.module}/lambda_function/lambda_handler.py"
@@ -52,10 +73,23 @@ resource "aws_lambda_function" "lambda_function" {
   timeout          = 15
   architectures    = ["x86_64"]
 
+
+
+  # Environment variables used by Lambda code
+  environment {
+    variables = {
+      TABLE_NAME     = aws_dynamodb_table.stock_news_table.name
+      AWS_REGION     = "us-east-1"
+      USE_COMPREHEND = "true"
+    }
+  }
   depends_on = [
     aws_iam_role_policy_attachment.lambda_logs,
-    aws_iam_role_policy_attachment.comprehend_access
+    aws_iam_role_policy_attachment.comprehend_access,
+    aws_iam_role_policy_attachment.ddb_write_attach
   ]
+
+
 }
 
 resource "aws_lambda_function_url" "lambda_url" {
@@ -69,6 +103,71 @@ resource "aws_lambda_function_url" "lambda_url" {
   }
 }
 
+
+
+
+########################################
+# DYNAMODB TABLE
+########################################
+
+resource "aws_dynamodb_table" "stock_news_table" {
+  name         = "stock-news-analyzer-table-${var.environment}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "symbol"
+  range_key    = "created_at"
+
+  attribute {
+    name = "symbol"
+    type = "S"
+  }
+  attribute {
+    name = "created_at"
+    type = "S"
+  }
+  tags = { Name = "Stock News Analyzer Table" }
+}
+
+
+
+
+
+# API Gateway for Lambda Function
+resource "aws_apigatewayv2_api" "http_api" {
+  name          = "stock-news-analyzer-api-${var.environment}"
+  protocol_type = "HTTP"
+}
+
+resource "aws_apigatewayv2_integration" "lambda_integration" {
+  api_id                 = aws_apigatewayv2_api.http_api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.lambda_function.arn
+  payload_format_version = "2.0"
+}
+
+resource "aws_apigatewayv2_route" "post_analyze" {
+  api_id    = aws_apigatewayv2_api.http_api.id
+  route_key = "POST /analyze"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
+}
+
+resource "aws_apigatewayv2_stage" "default" {
+  api_id      = aws_apigatewayv2_api.http_api.id
+  name        = "$default"
+  auto_deploy = true
+}
+
+resource "aws_lambda_permission" "allow_apigw_invoke" {
+  statement_id  = "AllowApiGwInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_function.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/*"
+}
+
+output "api_base_url" {
+  value       = aws_apigatewayv2_api.http_api.api_endpoint
+  description = "Base URL for the HTTP API. POST to /analyze"
+}
 
 # S3 Buckets
 ###############################################
@@ -112,6 +211,10 @@ resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" 
   ignore_public_acls      = false
   restrict_public_buckets = false
 }
+
+
+
+
 
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
