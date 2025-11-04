@@ -85,12 +85,12 @@ jobs:
 
       # Step 9: Install npm
       - name: Install npm
-        run: npm install
+        run: npm ci
         working-directory: ./stock-news-app
 
-      # Step 10: Install Cognito npm files
-      - name: Install Cognito Identity SDK
-        run: npm install amazon-cognito-identity-js
+      # Step 10: Install dependencies
+      - name: Install Cognito Identity SDK and React Router Dom
+        run: npm install amazon-cognito-identity-js react-router-dom@6
         working-directory: ./stock-news-app
 
       # Step 11: Build React app

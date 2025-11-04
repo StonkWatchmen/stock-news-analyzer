@@ -1,4 +1,3 @@
-// SignIn.js
 import React, { useState } from "react";
 import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 import { userPool } from "../cognito";
