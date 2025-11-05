@@ -4,12 +4,6 @@ provider "aws" {
   region = "us-east-1"
 }
 
-resource "aws_s3_account_public_access_block" "account" {
-  block_public_acls       = false
-  block_public_policy     = false  
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
 
 # IAM Role for Lambda Function
 data "aws_iam_policy_document" "assume_role" {
@@ -28,7 +22,6 @@ resource "aws_iam_role" "iam_for_lambda" {
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
-
 #IAM Policy Attachments for Lambda Logs & Comprehend
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
   role       = aws_iam_role.iam_for_lambda.name
@@ -40,10 +33,7 @@ resource "aws_iam_role_policy_attachment" "comprehend_access" {
   policy_arn = "arn:aws:iam::aws:policy/ComprehendFullAccess"
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
-  role       = aws_iam_role.iam_for_lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
+
 
 
 
@@ -51,12 +41,13 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
 
 data "archive_file" "name" {
   type        = "zip"
-  source_dir  = "${path.module}/lambda_function"
+  source_file = "${path.module}/lambda_function/lambda_handler.py"
   output_path = "${path.module}/lambda.zip"
 }
 
 
 # Lambda Function & Public URL
+
 resource "aws_lambda_function" "lambda_function" {
   filename         = data.archive_file.name.output_path
   function_name    = "stock_news_analyzer_lambda"
@@ -67,30 +58,21 @@ resource "aws_lambda_function" "lambda_function" {
   timeout          = 15
   architectures    = ["x86_64"]
 
+
+
   # Environment variables used by Lambda code
   environment {
     variables = {
-      DB_HOST        = aws_db_instance.stock_news_analyzer_db.address
-      DB_PORT        = "3306"
-      DB_USER        = var.db_username
-      DB_PASS        = var.db_password
-      DB_NAME        = "stocknewsanalyzerdb"
+      TABLE_NAME     = aws_dynamodb_table.stock_news_table.name
       USE_COMPREHEND = "true"
     }
   }
-
-  vpc_config {
-
-    subnet_ids         = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.subnet_ids
-    security_group_ids = [aws_security_group.lambda_sg.id]
-  }
-
-
   depends_on = [
     aws_iam_role_policy_attachment.lambda_logs,
     aws_iam_role_policy_attachment.comprehend_access,
-    aws_iam_role_policy_attachment.lambda_vpc_access
+    aws_iam_role_policy_attachment.ddb_write_attach
   ]
+
 
 }
 
@@ -110,6 +92,7 @@ resource "aws_lambda_function_url" "lambda_url" {
 
 
 
+
 ########################################
 # API Gateway for Lambda Function
 resource "aws_apigatewayv2_api" "http_api" {
@@ -121,7 +104,7 @@ resource "aws_apigatewayv2_api" "http_api" {
 resource "aws_apigatewayv2_integration" "lambda_integration" {
   api_id                 = aws_apigatewayv2_api.http_api.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.lambda_function.invoke_arn
+  integration_uri        = aws_lambda_function.lambda_function.arn
   payload_format_version = "2.0"
 }
 
@@ -210,12 +193,9 @@ resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" 
 # IAM Policy Document to allow public read access to S3 bucket objects
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
-  policy = data.aws_iam_policy_document.get_object_iam_policy.json
 
-  depends_on = [
-    aws_s3_account_public_access_block.account,
-    aws_s3_bucket_public_access_block.react_bucket_public_access_block
-  ]
+  policy     = data.aws_iam_policy_document.get_object_iam_policy.json
+  depends_on = [aws_s3_bucket_public_access_block.react_bucket_public_access_block]
 }
 
 ######################################################

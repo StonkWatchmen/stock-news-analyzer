@@ -1,224 +1,97 @@
-import os
-import json
-import base64
-import time
+import os, json, base64
 from datetime import datetime, timezone
-
-import pymysql
-
-
-_BOTO3 = None
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type,Authorization",
-    "Access-Control-Allow-Methods": "OPTIONS,GET,POST",
-    "Content-Type": "application/json",
+    "Access-Control-Allow-Methods": "OPTIONS,POST,GET",
+    "Content-Type": "application/json"
 }
 
-# ---------- helpers ----------
-def _now_iso() -> str:
+def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
-def _resp(code: int, obj) -> dict:
+def _resp(code, obj):
     return {"statusCode": code, "headers": CORS_HEADERS, "body": json.dumps(obj)}
 
-def _parse_body(event: dict) -> dict:
-    # Accept both direct test events and API Gateway v2 events
+def _parse_body(event):
+    # Supports: API Gateway proxy (possibly base64) and direct invoke with dict
     if isinstance(event, dict) and "body" not in event:
         return event
     body = event.get("body")
     if body is None:
         return {}
     if event.get("isBase64Encoded"):
-        try:
-            body = base64.b64decode(body).decode("utf-8", "ignore")
-        except Exception:
-            pass
+        body = base64.b64decode(body).decode("utf-8", "ignore")
     try:
         return json.loads(body)
     except Exception:
         return {}
 
-def _use_comprehend() -> bool:
-    return os.environ.get("USE_COMPREHEND", "false").lower() == "true"
+def _get_comprehend():
+    use_comprehend = os.getenv("USE_COMPREHEND", "true").lower() == "true"
+    if not use_comprehend:
+        return None, False
+    region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
+    return boto3.client("comprehend", region_name=region), True
 
-def _get_conn():
-    return pymysql.connect(
-        host=os.environ["DB_HOST"],
-        port=int(os.environ.get("DB_PORT", "3306")),
-        user=os.environ["DB_USER"],
-        password=os.environ["DB_PASS"],
-        database=os.environ["DB_NAME"],
-        autocommit=True,
-        cursorclass=pymysql.cursors.DictCursor,
-        connect_timeout=5,
-    )
-
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS news_analysis (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  symbol VARCHAR(16) NOT NULL,
-  created_at TIMESTAMP NOT NULL,
-  title VARCHAR(255) NULL,
-  content TEXT NOT NULL,
-  sentiment VARCHAR(16) NULL,
-  sentiment_pos DECIMAL(10,6) NULL,
-  sentiment_neg DECIMAL(10,6) NULL,
-  sentiment_neu DECIMAL(10,6) NULL,
-  sentiment_mix DECIMAL(10,6) NULL,
-  entities TEXT NULL,
-  ts BIGINT NOT NULL,
-  INDEX idx_symbol_created (symbol, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-"""
-
-def _ensure_schema(conn) -> None:
-    with conn.cursor() as cur:
-        cur.execute(_SCHEMA_SQL)
-
-def _analyze(text: str):
-    """
-    Returns dict: { sentiment: str|None, scores: {Positive,Negative,Neutral,Mixed}|None, entities: [str] }
-    Uses Comprehend only if USE_COMPREHEND=true. Falls back gracefully if not reachable.
-    """
-    if not _use_comprehend():
+def _analyze(text, comprehend, use_comprehend):
+    if not (use_comprehend and comprehend and text and text.strip()):
         return {"sentiment": None, "scores": None, "entities": []}
-
-    global _BOTO3
-    if _BOTO3 is None:
-        import boto3 as _BOTO3  # lazy import (available in Lambda runtime)
-
+    t = text[:4500]
     try:
-        comp = _BOTO3.client("comprehend")
-        det = comp.detect_sentiment(Text=text[:4500], LanguageCode="en")
-        ent = comp.detect_entities(Text=text[:4500], LanguageCode="en")
-        sentiment = det.get("Sentiment")
-        scores = det.get("SentimentScore") or {}
-        entities = [e["Text"] for e in ent.get("Entities", []) if e.get("Text")]
-        return {"sentiment": sentiment, "scores": scores, "entities": entities}
-    except Exception as e:
-        # In private subnets without NAT/VPC endpoints, external calls may fail; fall back silently.
-        print("Comprehend error:", repr(e))
+        s = comprehend.detect_sentiment(Text=t, LanguageCode="en")
+        e = comprehend.detect_entities(Text=t, LanguageCode="en")
+        return {
+            "sentiment": s.get("Sentiment"),
+            "scores": s.get("SentimentScore"),
+            "entities": [x.get("Text") for x in e.get("Entities", []) if x.get("Text")]
+        }
+    except (ClientError, BotoCoreError, Exception) as ce:
+        print("Comprehend error:", repr(ce))
         return {"sentiment": None, "scores": None, "entities": []}
 
-# ---------- handler ----------
 def lambda_handler(event, context):
-    # API Gateway HTTP API (v2) fields
-    method = (event.get("requestContext", {}).get("http", {}).get("method")
-              or event.get("httpMethod") or "GET")
-    raw_path = (event.get("requestContext", {}).get("http", {}).get("path")
-                or event.get("rawPath") or "/")
-    qs = event.get("queryStringParameters") or {}
+    try:
+        method = (event.get("requestContext", {}).get("http", {}).get("method")
+                  or event.get("httpMethod") or "GET")
 
-    # CORS preflight
-    if method == "OPTIONS":
-        return _resp(200, {"ok": True})
+        # CORS preflight
+        if method == "OPTIONS":
+            return _resp(200, {"ok": True})
 
-    # GET "/" 
-    if method == "GET":
-        limit = 10
-        try:
-            if "limit" in qs:
-                limit = max(1, min(100, int(qs["limit"])))
-        except Exception:
-            limit = 10
+        if method == "GET":
+            return _resp(200, {
+                "ok": True,
+                "message": "POST JSON to /analyze with {symbol,title,content}"
+            })
 
-        symbol = qs.get("symbol")
-        try:
-            conn = _get_conn()
-            _ensure_schema(conn)
-            with conn.cursor() as cur:
-                if symbol:
-                    cur.execute(
-                        """
-                        SELECT id, symbol, created_at, title, sentiment
-                        FROM news_analysis
-                        WHERE symbol = %s
-                        ORDER BY id DESC
-                        LIMIT %s
-                        """,
-                        (symbol.upper(), limit),
-                    )
-                else:
-                    cur.execute(
-                        """
-                        SELECT id, symbol, created_at, title, sentiment
-                        FROM news_analysis
-                        ORDER BY id DESC
-                        LIMIT %s
-                        """,
-                        (limit,),
-                    )
-                rows = cur.fetchall()
-            conn.close()
-            return _resp(200, {"ok": True, "count": len(rows), "records": rows})
-        except Exception as e:
-            print("DB read error:", repr(e))
-            return _resp(500, {"error": "db_read_failed"})
+        # No DynamoDB: we only optionally call Comprehend
+        comprehend, use_comprehend = _get_comprehend()
 
-    # POST "/analyze"
-    if method == "POST":
-        body = _parse_body(event)
-        symbol = (body.get("symbol") or "UNKNOWN").upper()
-        title = body.get("title")
-        content = (body.get("content") or "").strip()
+        b = _parse_body(event)
+        symbol  = (b.get("symbol") or "UNKNOWN").upper()
+        title   = b.get("title")
+        content = (b.get("content") or "").strip()
+
         if not content:
             return _resp(400, {"error": "content is required"})
 
-        analysis = _analyze(content)
-        created = _now_iso()
-        ts = int(time.time())
+        analysis = _analyze(content, comprehend, use_comprehend)
 
-        sp = sn = sneu = smix = None
-        if isinstance(analysis.get("scores"), dict):
-            sp = analysis["scores"].get("Positive")
-            sn = analysis["scores"].get("Negative")
-            sneu = analysis["scores"].get("Neutral")
-            smix = analysis["scores"].get("Mixed")
+        # Return analysis; previously we wrote to DynamoDB.
+        return _resp(201, {
+            "ok": True,
+            "symbol": symbol,
+            "title": title,
+            "sentiment": analysis["sentiment"],
+            "scores": analysis["scores"],
+            "entities": analysis["entities"],
+            "analyzed_at": _now_iso()
+        })
 
-        entities_csv = ",".join(analysis.get("entities") or [])
-
-        try:
-            conn = _get_conn()
-            _ensure_schema(conn)
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO news_analysis
-                      (symbol, created_at, title, content, sentiment,
-                       sentiment_pos, sentiment_neg, sentiment_neu, sentiment_mix,
-                       entities, ts)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        symbol,
-                        created,
-                        title,
-                        content[:2000],
-                        analysis["sentiment"],
-                        sp,
-                        sn,
-                        sneu,
-                        smix,
-                        entities_csv,
-                        ts,
-                    ),
-                )
-            conn.close()
-        except Exception as e:
-            print("DB write error:", repr(e))
-            return _resp(500, {"error": "db_write_failed"})
-
-        return _resp(
-            201,
-            {
-                "ok": True,
-                "symbol": symbol,
-                "sentiment": analysis["sentiment"],
-                "entities": analysis.get("entities", []),
-            },
-        )
-
-    # Any other method -> not allowed
-    return _resp(405, {"error": "method_not_allowed"})
+    except Exception as e:
+        print("Unhandled error:", repr(e))
+        return _resp(500, {"error": "internal_error"})
