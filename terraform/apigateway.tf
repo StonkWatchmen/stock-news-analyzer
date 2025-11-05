@@ -24,6 +24,7 @@ resource "aws_api_gateway_method" "get_stocks" {
   resource_id   = aws_api_gateway_resource.stocks.id
   http_method   = "GET"
   authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
   depends_on = [ aws_api_gateway_authorizer.cognito_authorizer ]
 }
 
