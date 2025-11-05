@@ -4,13 +4,9 @@ provider "aws" {
   region = var.aws_region
 }
 
-locals {
-  project_name = "stock-news-analyzer"
-}
-
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "${local.project_name}-terraform-state-bucket-${var.environment}"
+    bucket = "stock-news-analyzer-terraform-state-bucket-${var.environment}"
     force_destroy = true
 
     tags = {
@@ -20,7 +16,7 @@ resource "aws_s3_bucket" "terraform_bucket" {
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-    bucket = "${local.project_name}-react-app-bucket-${var.environment}"
+    bucket = "stock-news-analyzer-react-app-bucket-${var.environment}"
     force_destroy = true
 
     tags = {
@@ -60,7 +56,7 @@ resource "aws_s3_bucket_policy" "react_bucket_policy" {
 
 # RDS Instance
 resource "aws_db_instance" "stock_news_analyzer_db" {
-  identifier             = "${local.project_name}-db"                           # Unique identifier for the RDS instance
+  identifier             = "stock-news-analyzer-db"                           # Unique identifier for the RDS instance
   allocated_storage      = 20                                                 # 20GB of storage
   storage_type           = "gp2"                                              # General Purpose SSD
   engine                 = "mysql"                                            # MySQL database engine
@@ -98,9 +94,8 @@ resource "aws_instance" "db_init" {
 
     CREATE TABLE users (
         id INT AUTO_INCREMENT PRIMARY KEY NOT NULL, 
-        username VARCHAR(16) NOT NULL,
-        password VARCHAR(128) NOT NULL,
-        phone_number VARCHAR(10)
+        email VARCHAR(64) NOT NULL,
+        password VARCHAR(64) NOT NULL,
     );
 
     CREATE TABLE stocks (
@@ -134,7 +129,7 @@ resource "aws_instance" "db_init" {
 }
 
 resource "aws_cognito_user_pool" "user_pool" {
-  name = "${local.project_name}-user-pool"
+  name = "stock-news-analyzer-user-pool"
 
   auto_verified_attributes = ["email"]
 
@@ -154,7 +149,7 @@ resource "aws_cognito_user_pool" "user_pool" {
   }
 }
 resource "aws_cognito_user_pool_client" "web_client" {
-  name         = "${local.project_name}-client"
+  name         = "stock-news-analyzer-client"
   user_pool_id = aws_cognito_user_pool.user_pool.id
   generate_secret = false
 
@@ -175,6 +170,6 @@ resource "aws_cognito_user_pool_client" "web_client" {
   supported_identity_providers = ["COGNITO"]
 }
 resource "aws_cognito_user_pool_domain" "auth_domain" {
-  domain       = local.project_name
+  domain       = "stock-news-analyzer"
   user_pool_id = aws_cognito_user_pool.user_pool.id
 }
