@@ -4,6 +4,12 @@ provider "aws" {
   region = "us-east-1"
 }
 
+resource "aws_s3_account_public_access_block" "account" {
+  block_public_acls       = false
+  block_public_policy     = false  
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
 
 # IAM Role for Lambda Function
 data "aws_iam_policy_document" "assume_role" {
@@ -21,6 +27,7 @@ resource "aws_iam_role" "iam_for_lambda" {
   name               = "iam_for_lambda"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
+
 
 #IAM Policy Attachments for Lambda Logs & Comprehend
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
@@ -78,6 +85,12 @@ resource "aws_lambda_function" "lambda_function" {
     security_group_ids = [aws_security_group.lambda_sg.id]
   }
 
+
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_logs,
+    aws_iam_role_policy_attachment.comprehend_access,
+    aws_iam_role_policy_attachment.lambda_vpc_access
+  ]
 
 }
 
