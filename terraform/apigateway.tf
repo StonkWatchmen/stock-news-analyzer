@@ -22,6 +22,7 @@ resource "aws_api_gateway_authorizer" "cognito_authorizer" {
   type                   = "COGNITO_USER_POOLS"
   provider_arns          = [aws_cognito_user_pool.user_pool.arn]
   identity_source         = "method.request.header.Authorization"
+  depends_on = [ aws_cognito_user_pool.user_pool ]
 }
 
 resource "aws_iam_role" "lambda_role" {
@@ -47,10 +48,12 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
 }
 
 resource "aws_lambda_function" "get_stocks_lambda" {
+
   function_name = "get-stocks-lambda"
   role          = aws_iam_role.lambda_role.arn
   handler       = "handler.lambda_handler"
   runtime       = "python3.11"
+  depends_on = [ aws_api_gateway_authorizer.cognito_authorizer ]
 
   filename      = data.archive_file.get_stocks_zip.output_path
 
