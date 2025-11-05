@@ -60,17 +60,9 @@ resource "aws_lambda_function" "lambda_function" {
 
 
 
-  # Environment variables used by Lambda code
-  environment {
-    variables = {
-      TABLE_NAME     = aws_dynamodb_table.stock_news_table.name
-      USE_COMPREHEND = "true"
-    }
-  }
   depends_on = [
     aws_iam_role_policy_attachment.lambda_logs,
     aws_iam_role_policy_attachment.comprehend_access,
-    aws_iam_role_policy_attachment.ddb_write_attach
   ]
 
 
