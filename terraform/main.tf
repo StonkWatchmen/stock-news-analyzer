@@ -197,9 +197,12 @@ resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" 
 # IAM Policy Document to allow public read access to S3 bucket objects
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
+  policy = data.aws_iam_policy_document.get_object_iam_policy.json
 
-  policy     = data.aws_iam_policy_document.get_object_iam_policy.json
-  depends_on = [aws_s3_bucket_public_access_block.react_bucket_public_access_block]
+  depends_on = [
+    aws_s3_account_public_access_block.account,
+    aws_s3_bucket_public_access_block.react_bucket_public_access_block
+  ]
 }
 
 ######################################################
