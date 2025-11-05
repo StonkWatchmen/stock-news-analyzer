@@ -95,7 +95,7 @@ resource "aws_instance" "db_init" {
     CREATE TABLE users (
         id INT AUTO_INCREMENT PRIMARY KEY NOT NULL, 
         email VARCHAR(64) NOT NULL,
-        password VARCHAR(64) NOT NULL,
+        password VARCHAR(64) NOT NULL
     );
 
     CREATE TABLE stocks (
@@ -126,6 +126,27 @@ resource "aws_instance" "db_init" {
   tags = {
     Name = "db-init"
   }
+}
+
+resource "aws_iam_role" "ec2_role" {
+  name = "ec2-rds-init-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = { Service = "ec2.amazonaws.com" }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_basic_execution" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  depends_on = [ aws_iam_role.ec2_role ]
 }
 
 resource "aws_cognito_user_pool" "user_pool" {
