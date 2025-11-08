@@ -1,8 +1,15 @@
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useState} from "react";
 import {getWatchlist, saveWatchlist } from "../utils/storage";
 import "./Watchlist.css"
 
 const TICKER_REGEX = /^[A-Z.-]{1,10}$/;    // Allows ticker patterns like BRK.B, RDS.A, etc.
+const API_BASE = process.env.REACT_APP_API_BASE;
+const USER_ID = 1; // until Cognito is hooked up
+
+// Keep tickers consistent: trim whitespace and uppercase
+function normalizeTicker(t) {
+    return t.trim().toUpperCase();
+}
 
 export default function Watchlist() {
     // Track ticker list, input value, and user error message. 
@@ -10,21 +17,57 @@ export default function Watchlist() {
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
 
-    // On load -> fetch saved watchlist from localStorage
+    const count = items.length;
+    const isDisabled = !input.trim();
+
+    // load from backend on mount
     useEffect(() => {
-        setItems(getWatchlist());
+        const fetchWatchlist = async () => {
+            if (!API_BASE) {
+                const local = getWatchlist();
+                setItems(local);
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/watchlist?user_id=${encodeURIComponent(USER_ID)}`);
+                if (!res.ok) {
+                    throw new Error("bad status");
+                }
+                const data = await res.json();
+                const tickers = data.tickers || [];
+                setItems(tickers);
+                saveWatchlist(tickers);
+            } catch (err) {
+                console.warn("Backend watchlist fetch failed, falling back to local:", err);
+                const local = getWatchlist();
+                setItems(local);
+            }
+        };
+        fetchWatchlist();    
     }, []);
 
-    const count = items.length;
-
-    // Disable "Add" button if input is empty or whitespace
-    const isDisabled = useMemo(() => !input.trim(), [input]);
-
-    // Keep tickers consistent: trim whitespace and uppercase
-    function normalizeTicker(ticker) {
-        return ticker.trim().toUpperCase();
+    async function syncAdd(ticker) {
+        if (!API_BASE) {
+            return;
+        }
+        await fetch(`${API_BASE}/watchlist`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: USER_ID, ticker }),
+        }); 
     }
-    
+
+    async function syncRemove(ticker) {
+        if (!API_BASE) {
+            return;
+        }
+        await fetch(`${API_BASE}/watchlist`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: USER_ID, ticker }),
+        });
+    }     
+           
     function handleAdd(e) {
         e.preventDefault();
 
@@ -55,6 +98,8 @@ export default function Watchlist() {
         // Reset form + clear errors
         setInput("");
         setError("");
+
+        syncAdd(symbol).catch((err) => console.error(err));
     }
 
     // Remove single ticker
@@ -62,6 +107,7 @@ export default function Watchlist() {
         const next = items.filter((t) => t !== symbol);
         setItems(next);
         saveWatchlist(next);
+        syncRemove(symbol).catch((err) => console.error(err));
     }
 
     // Clear all tickers (with confirmation)
@@ -69,6 +115,9 @@ export default function Watchlist() {
         if (!window.confirm("Clear all tickers from your watchlist?")) {
             return;
         }
+
+        // best effort clear on backend
+        items.forEach((t) => syncRemove(t).catch(() => {}));
         setItems([]);
         saveWatchlist([]);
     }
