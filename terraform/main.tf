@@ -82,7 +82,14 @@ resource "aws_instance" "db_init" {
   user_data = <<-EOF
     #!/bin/bash
     yum install -y mysql
-    sleep 30
+
+    # Retry loop until DB is ready
+    until mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
+                -u ${var.db_username} \
+                -p${var.db_password} \
+                -e "SELECT 1" >/dev/null 2>&1; do
+        sleep 5
+    done
 
     mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
           -u ${var.db_username} \
@@ -130,6 +137,7 @@ resource "aws_instance" "db_init" {
     Name = "db-init"
   }
 }
+
 
 resource "aws_iam_role" "ec2_role" {
   name = "stock-news-analyzer-ec2-role"
