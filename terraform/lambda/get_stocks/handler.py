@@ -23,7 +23,7 @@ def _resp(status, body):
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
-            "Access-Control-Allow_Headers": "Content-Type",            
+            "Access-Control-Allow-Headers": "Content-Type",            
         },
         "body": json.dumps(body),
     } 
@@ -40,7 +40,7 @@ def get_watchlist(conn, user_id):
             SELECT s.ticker
             FROM watchlist w
             JOIN stocks s ON w.stock_id = s.id
-            WHERE w.user_id = %s;
+            WHERE w.user_id = %s
             ORDER BY s.ticker;
             """,
             (user_id,),
@@ -79,7 +79,7 @@ def remove_from_watchlist(conn, user_id, ticker):
     with conn.cursor() as cursor:
         cursor.execute("SELECT id FROM stocks WHERE ticker = %s;", (ticker,))        
         row = cursor.fetchone()
-        if row:
+        if not row:
             return
         stock_id = row["id"]
         cursor.execute(
@@ -126,7 +126,7 @@ def lambda_handler(event, context):
     try:
         conn = get_db_connection()
     except Exception as e:
-        return _resp(500, {f"DB connection failed: {str(e)}"})
+        return _resp(500, {"error", f"DB connection failed: {str(e)}"})
     
     try:
         # GET /stocks
