@@ -194,3 +194,18 @@ resource "aws_cognito_user_pool_domain" "auth_domain" {
   domain       = "stock-news-analyzer-${var.environment}"
   user_pool_id = aws_cognito_user_pool.user_pool.id
 }
+
+resource "null_resource" "package_lambda" {
+  provisioner "local-exec" {
+    command = <<EOT
+      rm -rf ${path.module}/build
+      mkdir -p ${path.module}/build
+      cp ${path.module}/lambda/get_stocks/handler.py ${path.module}/build/
+      pip install -r ${path.module}/lambda/get_stocks/requirements.txt -t ${path.module}/build/
+    EOT
+  }
+
+  triggers = {
+    always_run = timestamp()
+  }
+}

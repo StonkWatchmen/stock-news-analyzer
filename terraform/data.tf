@@ -45,8 +45,10 @@ data "aws_iam_policy_document" "get_object_iam_policy" {
     }
 }
 
+
 data "archive_file" "get_stocks_zip" {
-    type = "zip"
-    source_dir  = "${path.module}/lambda/get_stocks"
-    output_path = "${path.module}/get_stocks.zip"
+  depends_on  = [null_resource.package_lambda]
+  type        = "zip"
+  source_dir  = "${path.module}/build"
+  output_path = "${path.module}/get_stocks.zip"
 }
