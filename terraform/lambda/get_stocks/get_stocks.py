@@ -24,7 +24,7 @@ def lambda_handler(event, context):
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute("SELECT * FROM stocks;")
-            result = cursor.fetchone()
+            result = cursor.fetchall()
 
         conn.close()
 
@@ -32,7 +32,7 @@ def lambda_handler(event, context):
             "statusCode": 200,
             "body": json.dumps({
                 "message": "DB connection successful",
-                "timestamp": result[0]
+                "stocks": result
             })
         }
 
