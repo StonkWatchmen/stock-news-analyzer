@@ -191,6 +191,6 @@ resource "aws_cognito_user_pool_client" "web_client" {
   supported_identity_providers = ["COGNITO"]
 }
 resource "aws_cognito_user_pool_domain" "auth_domain" {
-  domain       = "stock-news-analyzer"
+  domain       = "stock-news-analyzer-${var.environment}"
   user_pool_id = aws_cognito_user_pool.user_pool.id
 }
