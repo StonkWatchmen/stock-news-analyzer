@@ -72,22 +72,23 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
 }
 
 resource "aws_instance" "db_init" {
-  ami           = data.aws_ami.amazonlinux.id
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public_subnet.id
-  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+  ami                         = data.aws_ami.amazonlinux.id
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.public_subnet.id
+  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
   associate_public_ip_address = true
-  depends_on = [ aws_db_instance.stock_news_analyzer_db ]
-  
+  depends_on                  = [aws_db_instance.stock_news_analyzer_db]
+
   user_data = <<-EOF
     #!/bin/bash
     yum install -y mysql
-    
+    sleep 30
+
     mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
           -u ${var.db_username} \
           -p${var.db_password} \
-          stocknewsanalyzerdb << 'MYSQL'
-    
+          stocknewsanalyzerdb <<MYSQL
+
     DROP TABLE IF EXISTS watchlist;
     DROP TABLE IF EXISTS users;
     DROP TABLE IF EXISTS stocks;
@@ -111,7 +112,7 @@ resource "aws_instance" "db_init" {
         FOREIGN KEY (stock_id) REFERENCES stocks(id)
     );
 
-    INSERT INTO stocks(ticker) 
+    INSERT INTO stocks (ticker)
     VALUES
         ('AAPL'),
         ('NFLX'),
@@ -121,6 +122,8 @@ resource "aws_instance" "db_init" {
         ('MSFT'),
         ('AMD');
     MYSQL
+
+    shutdown -h now
   EOF
 
   tags = {
