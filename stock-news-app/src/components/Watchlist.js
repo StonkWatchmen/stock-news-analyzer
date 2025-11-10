@@ -16,7 +16,7 @@ export default function Watchlist() {
     const [items, setItems] = useState([]);
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
-
+    const [quotes, setQuotes] = useState([]);
     const count = items.length;
     const isDisabled = !input.trim();
 
@@ -26,6 +26,7 @@ export default function Watchlist() {
             if (!API_BASE) {
                 const local = getWatchlist();
                 setItems(local);
+                await fetchQuotesFor(local);
                 return;
             }
             try {
@@ -37,10 +38,12 @@ export default function Watchlist() {
                 const tickers = data.tickers || [];
                 setItems(tickers);
                 saveWatchlist(tickers);
+                await fetchQuotesFor(tickers);
             } catch (err) {
                 console.warn("Backend watchlist fetch failed, falling back to local:", err);
                 const local = getWatchlist();
                 setItems(local);
+                await fetchQuotesFor(local);
             }
         };
         fetchWatchlist();    
@@ -67,8 +70,28 @@ export default function Watchlist() {
             body: JSON.stringify({ user_id: USER_ID, ticker }),
         });
     }     
+
+    async function fetchQuotesFor(list) {
+        if (!API_BASE || !list.length) { setQuotes([]); return; }
+            const qs = encodeURIComponent(list.join(","));
+        try {
+            const res = await fetch(`${API_BASE}/quotes?tickers=${qs}`);
+        if (!res.ok) throw new Error(`quotes ${res.status}`);
+            const data = await res.json();
+            setQuotes(data.quotes || []);
+        } catch (e) {
+            console.warn("Fetching quotes failed:", e);
+            setQuotes([]);
+        }
+    }
+
+
+
+
+
+
            
-    function handleAdd(e) {
+    async function handleAdd(e) {
         e.preventDefault();
 
         // Validation chain -> normalize, check format, check duplicates, check limit
@@ -99,15 +122,19 @@ export default function Watchlist() {
         setInput("");
         setError("");
 
-        syncAdd(symbol).catch((err) => console.error(err));
+        // syncAdd(symbol).catch((err) => console.error(err));
+        try { await syncAdd(symbol); } catch (err) { console.error(err); }
+        await fetchQuotesFor(next);
     }
 
     // Remove single ticker
-    function handleRemove(symbol) {
+    async function handleRemove(symbol) {
         const next = items.filter((t) => t !== symbol);
         setItems(next);
         saveWatchlist(next);
-        syncRemove(symbol).catch((err) => console.error(err));
+        // syncRemove(symbol).catch((err) => console.error(err));
+        try { await syncRemove(symbol); } catch (err) { console.error(err); }
+        await fetchQuotesFor(next);
     }
 
     // Clear all tickers (with confirmation)
@@ -120,6 +147,7 @@ export default function Watchlist() {
         items.forEach((t) => syncRemove(t).catch(() => {}));
         setItems([]);
         saveWatchlist([]);
+        setQuotes([]);
     }
 
     return (
@@ -152,18 +180,33 @@ export default function Watchlist() {
             </div>
 
             <ul className="watchlist-items">
-                {items.map((t) => (
+                {items.map((t) => {
+                const q = quotes.find((x) => x.ticker === t) || {};
+                const pct = q.change_pct;
+
+                return (
                     <li key={t} className="watchlist-item">
-                        <span className="ticker">{t}</span>
-                        <button
-                            className="remove-btn"
-                            onClick={() => handleRemove(t)}
-                            title="Remove this ticker"
-                        >
-                            x
-                        </button>
+                    <span className="ticker">{t}</span>
+
+                    <div className="watchlist-values">
+                        <span className="price">
+                        {q.price != null ? `$${q.price.toFixed(2)}` : "—"}
+                        </span>
+                        <span className={`pct ${pct == null ? "" : pct >= 0 ? "up" : "down"}`}>
+                        {pct != null ? `${pct.toFixed(2)}%` : "—"}
+                        </span>
+                    </div>
+
+                    <button
+                        className="remove-btn"
+                        onClick={() => handleRemove(t)}
+                        title="Remove this ticker"
+                    >
+                        x
+                    </button>
                     </li>
-                ))}
+                );
+                })}
             </ul> 
         </div>
     );

@@ -174,3 +174,28 @@
     color: #ff6e6e;
   }
   
+
+ 
+.watchlist-values {
+  display: flex;
+  align-items: center;
+  gap: 8px;           
+}
+
+/* distinct formatting */
+.price {
+  color: var(--text);
+}
+
+.pct {
+  font-weight: 600;
+}
+
+
+.pct.up {
+  color: #16a34a;       /* green */
+}
+
+.pct.down {
+  color: #dc2626;       /* red */
+}
