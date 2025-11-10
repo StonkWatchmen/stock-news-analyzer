@@ -1,11 +1,15 @@
 import os
 import json
 import pymysql
+import urllib.request, urllib.parse
+from decimal import Decimal
+
 
 DB_HOST = os.environ['DB_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASS = os.environ['DB_PASS']
 DB_NAME = os.environ['DB_NAME']
+ALPHA_VANTAGE_KEY = os.environ.get('ALPHA_VANTAGE_KEY')  
 
 def get_db_connection():
     return pymysql.connect(
@@ -13,7 +17,8 @@ def get_db_connection():
         user=DB_USER,
         password=DB_PASS,
         database=DB_NAME,
-        connect_timeout=5
+        connect_timeout=5,
+        cursorclass=pymysql.cursors.DictCursor        
     )
     
 def _resp(status, body):
@@ -89,6 +94,92 @@ def remove_from_watchlist(conn, user_id, ticker):
     conn.commit()         
        
 
+def _http_get_json(url):
+    with urllib.request.urlopen(url, timeout=8) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _fetch_alpha_vantage_quote(symbol: str):
+    if not ALPHA_VANTAGE_KEY:
+        # return graceful error so UI can show message
+        return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
+    base = "https://www.alphavantage.co/query"
+    qs = urllib.parse.urlencode(
+        {"function": "GLOBAL_QUOTE", "symbol": symbol, "apikey": ALPHA_VANTAGE_KEY}
+    )
+    data = _http_get_json(f"{base}?{qs}")
+    q = data.get("Global Quote", {})
+    if not q:
+        return {"ticker": symbol, "error": "No quote"}
+    try:
+        price = float(Decimal(q.get("05. price", "0")))
+    except Exception:
+        price = None
+    chg_pct_raw = (q.get("10. change percent") or "0").replace("%", "")
+    try:
+        change_pct = float(Decimal(chg_pct_raw))
+    except Exception:
+        change_pct = None
+    return {"ticker": symbol, "price": price, "change_pct": change_pct}
+
+
+
+
+def _fetch_quotes_live(tickers):
+    out = []
+    for t in tickers:
+        t = t.strip().upper()
+        if not t:
+            continue
+        out.append(_fetch_alpha_vantage_quote(t))
+    return out
+
+
+def _upsert_prices(conn, quotes):
+    if not quotes:
+        return
+    with conn.cursor() as c:
+        for q in quotes:
+            if "price" not in q or q.get("price") is None:
+                continue
+            c.execute("SELECT id FROM stocks WHERE ticker=%s", (q["ticker"],))
+            r = c.fetchone()
+            if not r:
+                c.execute("INSERT INTO stocks(ticker) VALUES (%s)", (q["ticker"],))
+                stock_id = c.lastrowid
+            else:
+                stock_id = r["id"]
+            c.execute("""
+                INSERT INTO prices(stock_id, price, change_pct)
+                VALUES (%s,%s,%s)
+                ON DUPLICATE KEY UPDATE price=VALUES(price), change_pct=VALUES(change_pct)
+            """, (stock_id, q["price"], q.get("change_pct")))
+    conn.commit()
+
+def _get_cached_quotes(conn, tickers):
+    if not tickers:
+        return []
+    fmt = ",".join(["%s"] * len(tickers))
+    with conn.cursor() as c:
+        c.execute(f"""
+            SELECT s.ticker, p.price, p.change_pct, p.updated_at
+            FROM stocks s
+            JOIN prices p ON p.stock_id = s.id
+            WHERE s.ticker IN ({fmt})
+        """, tuple(t.upper() for t in tickers))
+        rows = c.fetchall()
+    return [
+        {
+            "ticker": r["ticker"],
+            "price": float(r["price"]) if r["price"] is not None else None,
+            "change_pct": float(r["change_pct"]) if r["change_pct"] is not None else None,
+            "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else None
+        }
+        for r in rows
+    ]
+
+
+
 def lambda_handler(event, context):
     # """
     # Handles API Gateway requests and returns a JSON response.
@@ -146,6 +237,26 @@ def lambda_handler(event, context):
             conn.close()
             return _resp(200, {"user_id": int(user_id), "tickers": tickers})
         
+
+        # ---- GET /quotes?tickers=AAPL,MSFT
+        if path.endswith("/quotes") and method == "GET":
+            qs = event.get("queryStringParameters") or {}
+            tickers = [t.strip().upper() for t in (qs.get("tickers", "").split(",")) if t.strip()]
+            if not tickers:
+                conn.close()
+                return _resp(400, {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"})
+            cached = _get_cached_quotes(conn, tickers)
+            have = {r["ticker"] for r in cached}
+            need = [t for t in tickers if t not in have]
+            fresh = _fetch_quotes_live(need) if need else []
+            if fresh:
+                _upsert_prices(conn, fresh)
+            out = sorted(cached + fresh, key=lambda r: r["ticker"])
+            conn.close()
+            return _resp(200, {"quotes": out})
+        
+
+
         # body for POST/DELETE
         body = {}
         if event.get("body"):

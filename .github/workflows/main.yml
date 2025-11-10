@@ -39,6 +39,7 @@ jobs:
       TF_VAR_db_username: ${{ secrets.DB_USERNAME}}
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_alpha_vantage_key: ${{ secrets.ALPHA_VANTAGE_KEY }}
       ENVIRONMENT_NAME: ${{ github.event.inputs.target }}
 
     steps:
@@ -129,6 +130,7 @@ jobs:
       TF_VAR_db_username: ${{ secrets.DB_USERNAME}}
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      var TF_VAR_alpha_vantage_key: ${{ secrets.ALPHA_VANTAGE_KEY }}
       ENVIRONMENT_NAME: ${{ github.event.inputs.target }}
 
     steps:

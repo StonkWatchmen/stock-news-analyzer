@@ -6,22 +6,22 @@ provider "aws" {
 
 # S3 Bucket to store Terraform state
 resource "aws_s3_bucket" "terraform_bucket" {
-    bucket = "stock-news-analyzer-terraform-state-bucket-${var.environment}"
-    force_destroy = true
+  bucket        = "stock-news-analyzer-terraform-state-bucket-${var.environment}"
+  force_destroy = true
 
-    tags = {
-        Name = "Stock News Analyzer Terraform State Bucket"
-    }
+  tags = {
+    Name = "Stock News Analyzer Terraform State Bucket"
+  }
 }
 
 # S3 Bucket to host static website
 resource "aws_s3_bucket" "react_bucket" {
-    bucket = "stock-news-analyzer-react-app-bucket-${var.environment}"
-    force_destroy = true
+  bucket        = "stock-news-analyzer-react-app-bucket-${var.environment}"
+  force_destroy = true
 
-    tags = {
-        Name = "Stock News Analyzer React App Bucket"
-    }
+  tags = {
+    Name = "Stock News Analyzer React App Bucket"
+  }
 }
 
 resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
@@ -35,39 +35,39 @@ resource "aws_s3_bucket_website_configuration" "react_bucket_website_config" {
     key = "error.html"
   }
 
-  depends_on = [ aws_s3_bucket.react_bucket ]
+  depends_on = [aws_s3_bucket.react_bucket]
 }
 
 resource "aws_s3_bucket_public_access_block" "react_bucket_public_access_block" {
   bucket = aws_s3_bucket.react_bucket.id
 
-  block_public_acls = false
-  block_public_policy = false
-  ignore_public_acls = false
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
   restrict_public_buckets = false
 }
 
 resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
 
-  policy = data.aws_iam_policy_document.get_object_iam_policy.json
+  policy     = data.aws_iam_policy_document.get_object_iam_policy.json
   depends_on = [aws_s3_bucket_public_access_block.react_bucket_public_access_block]
 }
 
 # RDS Instance
 resource "aws_db_instance" "stock_news_analyzer_db" {
-  identifier             = "stock-news-analyzer-db"                           # Unique identifier for the RDS instance
-  allocated_storage      = 20                                                 # 20GB of storage
-  storage_type           = "gp2"                                              # General Purpose SSD
-  engine                 = "mysql"                                            # MySQL database engine
-  engine_version         = "8.0"                                              # MySQL version 8.0
-  instance_class         = "db.t3.micro"                                      # Free tier eligible instance type
-  db_name                = "stocknewsanalyzerdb"                              # Name of the Stock News Analyzer database
-  username               = var.db_username                                    # Database admin username
-  password               = var.db_password                                    # Replace with a secure password
-  parameter_group_name   = "default.mysql8.0"                                 # Default parameter group for MySQL 8.0
-  skip_final_snapshot    = true                                               # Skip final snapshot when destroying the database
-  vpc_security_group_ids = [aws_security_group.rds_sg.id]                     # Attach the RDS security group
+  identifier             = "stock-news-analyzer-db"                                     # Unique identifier for the RDS instance
+  allocated_storage      = 20                                                           # 20GB of storage
+  storage_type           = "gp2"                                                        # General Purpose SSD
+  engine                 = "mysql"                                                      # MySQL database engine
+  engine_version         = "8.0"                                                        # MySQL version 8.0
+  instance_class         = "db.t3.micro"                                                # Free tier eligible instance type
+  db_name                = "stocknewsanalyzerdb"                                        # Name of the Stock News Analyzer database
+  username               = var.db_username                                              # Database admin username
+  password               = var.db_password                                              # Replace with a secure password
+  parameter_group_name   = "default.mysql8.0"                                           # Default parameter group for MySQL 8.0
+  skip_final_snapshot    = true                                                         # Skip final snapshot when destroying the database
+  vpc_security_group_ids = [aws_security_group.rds_sg.id]                               # Attach the RDS security group
   db_subnet_group_name   = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.name # Use the created subnet group
 }
 
@@ -146,9 +146,9 @@ resource "aws_iam_role" "ec2_role" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "ec2.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -157,7 +157,7 @@ resource "aws_iam_role" "ec2_role" {
 resource "aws_iam_role_policy_attachment" "ec2_basic_execution" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-  depends_on = [ aws_iam_role.ec2_role ]
+  depends_on = [aws_iam_role.ec2_role]
 }
 
 resource "aws_cognito_user_pool" "user_pool" {
@@ -181,8 +181,8 @@ resource "aws_cognito_user_pool" "user_pool" {
   }
 }
 resource "aws_cognito_user_pool_client" "web_client" {
-  name         = "stock-news-analyzer-client"
-  user_pool_id = aws_cognito_user_pool.user_pool.id
+  name            = "stock-news-analyzer-client"
+  user_pool_id    = aws_cognito_user_pool.user_pool.id
   generate_secret = false
 
   explicit_auth_flows = [

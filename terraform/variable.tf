@@ -16,3 +16,9 @@ variable "environment" {
   description = "Github environment name for s3 buckets"
   type        = string
 }
+
+variable "alpha_vantage_key" {
+  type        = string
+  sensitive   = true
+  description = "Alpha Vantage API key"
+}

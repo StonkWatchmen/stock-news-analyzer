@@ -16,12 +16,12 @@ resource "aws_api_gateway_resource" "watchlist" {
 }
 
 resource "aws_api_gateway_authorizer" "cognito_authorizer" {
-  name                   = "stock-news-analyzer-cognito-authorizer"
-  rest_api_id            = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  type                   = "COGNITO_USER_POOLS"
-  provider_arns          = [aws_cognito_user_pool.user_pool.arn]
-  identity_source         = "method.request.header.Authorization"
-  depends_on = [ aws_cognito_user_pool.user_pool ]
+  name            = "stock-news-analyzer-cognito-authorizer"
+  rest_api_id     = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  type            = "COGNITO_USER_POOLS"
+  provider_arns   = [aws_cognito_user_pool.user_pool.arn]
+  identity_source = "method.request.header.Authorization"
+  depends_on      = [aws_cognito_user_pool.user_pool]
 }
 
 resource "aws_api_gateway_method" "get_stocks" {
@@ -30,7 +30,7 @@ resource "aws_api_gateway_method" "get_stocks" {
   http_method   = "GET"
   authorization = "COGNITO_USER_POOLS"
   authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
-  depends_on = [ aws_api_gateway_authorizer.cognito_authorizer ]
+  depends_on    = [aws_api_gateway_authorizer.cognito_authorizer]
 }
 
 resource "aws_api_gateway_method" "get_watchlist" {
@@ -75,7 +75,7 @@ resource "aws_iam_role" "lambda_role" {
 resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  depends_on = [ aws_iam_role.lambda_role ]
+  depends_on = [aws_iam_role.lambda_role]
 }
 
 resource "aws_iam_role_policy" "lambda_vpc_access" {
@@ -86,8 +86,8 @@ resource "aws_iam_role_policy" "lambda_vpc_access" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "ec2:CreateNetworkInterface",
           "ec2:DescribeNetworkInterfaces",
           "ec2:DeleteNetworkInterface"
@@ -108,14 +108,15 @@ resource "aws_lambda_function" "get_stocks_lambda" {
   handler       = "handler.lambda_handler"
   runtime       = "python3.11"
 
-  filename      = data.archive_file.get_stocks_zip.output_path
+  filename = data.archive_file.get_stocks_zip.output_path
 
   environment {
     variables = {
-      DB_HOST = aws_db_instance.stock_news_analyzer_db.address
-      DB_USER = var.db_username
-      DB_PASS = var.db_password
-      DB_NAME = "stocknewsanalyzerdb"
+      DB_HOST           = aws_db_instance.stock_news_analyzer_db.address
+      DB_USER           = var.db_username
+      DB_PASS           = var.db_password
+      DB_NAME           = "stocknewsanalyzerdb"
+      ALPHA_VANTAGE_KEY = var.alpha_vantage_key
     }
   }
 
