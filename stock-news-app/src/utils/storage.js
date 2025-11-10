@@ -1,6 +1,5 @@
 const KEY =  "watchlist:v1";    // Storage key for future migrations
 
-export function saveWatchlist(list) { /* ... */ }
 export function getWatchlist() {
     try {
         const raw = localStorage.getItem(KEY);
