@@ -15,8 +15,9 @@ output "cognito_domain" {
 }
 
 
-output "api_base_url" {
-  value       = aws_api_gateway_deployment.stock-news-analyzer-deployment.invoke_url
-  description = "API base URL (stage)"
-}
 
+
+output "api_base_url" {
+  description = "API base URL (stage)"
+  value       = "https://${aws_api_gateway_rest_api.stock-news-analyzer-api.id}.execute-api.${var.aws_region}.amazonaws.com/${var.api_stage}"
+}
