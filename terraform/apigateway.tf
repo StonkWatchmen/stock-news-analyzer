@@ -165,6 +165,28 @@ resource "aws_api_gateway_integration" "delete_watchlist_lambda_integration" {
   uri                     = aws_lambda_function.get_stocks_lambda.invoke_arn
 }
 
+resource "aws_api_gateway_resource" "quotes" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  parent_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.root_resource_id
+  path_part   = "quotes"
+}
+
+resource "aws_api_gateway_method" "get_quotes" {
+  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id   = aws_api_gateway_resource.quotes.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_quotes_lambda_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id             = aws_api_gateway_resource.quotes.id
+  http_method             = aws_api_gateway_method.get_quotes.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.get_stocks_lambda.invoke_arn
+}
+
 resource "aws_lambda_permission" "apigw_invoke" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
