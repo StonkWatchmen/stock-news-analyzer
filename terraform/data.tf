@@ -52,3 +52,9 @@ data "archive_file" "get_stocks_zip" {
   source_dir  = "${path.module}/build"
   output_path = "${path.module}/get_stocks.zip"
 }
+
+data "archive_file" "init_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda/init_rds"
+  output_path = "${path.module}/lambda_init_db.zip"
+}

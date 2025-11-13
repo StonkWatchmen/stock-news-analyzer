@@ -195,18 +195,12 @@ resource "aws_lambda_permission" "apigw_invoke" {
   source_arn    = "${aws_api_gateway_rest_api.stock-news-analyzer-api.execution_arn}/*/*"
 }
 
-data "archive_file" "init_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/lambda/init_rds"
-  output_path = "${path.module}/lambda_init_db.zip"
-}
-
 resource "aws_lambda_function" "init_rds_lambda" {
   role = aws_iam_role.lambda_role
   function_name = "init_rds_lambda"
   handler = "lambda_function.lambda_handler"
   runtime = "python3.12"
-  filename = data.archive_file.lambda_zip
+  filename = data.archive_file.lambda_zip.output_path
 
   environment {
     variables = {
