@@ -196,7 +196,7 @@ resource "aws_lambda_permission" "apigw_invoke" {
 }
 
 resource "aws_lambda_function" "init_rds_lambda" {
-  role = aws_iam_role.lambda_role
+  role = aws_iam_role.lambda_role.arn
   function_name = "init_rds_lambda"
   handler = "lambda_function.lambda_handler"
   runtime = "python3.12"
