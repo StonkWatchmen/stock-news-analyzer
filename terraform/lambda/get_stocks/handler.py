@@ -336,7 +336,7 @@ def lambda_handler(event, context):
                     {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
                 )
 
-            # We don't need the DB for sentiment; close it now.
+            # We don't need the DB for sentiment; close it.
             conn.close()
 
             sentiments = _fetch_news_sentiment_for_tickers(tickers)
