@@ -200,7 +200,7 @@ resource "aws_lambda_function" "init_rds_lambda" {
   function_name = "init_rds_lambda"
   handler = "lambda_function.lambda_handler"
   runtime = "python3.12"
-  filename = data.archive_file.lambda_zip.output_path
+  filename = data.archive_file.init_zip.output_path
 
   environment {
     variables = {
