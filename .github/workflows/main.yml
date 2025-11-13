@@ -97,6 +97,13 @@ jobs:
           echo "REACT_APP_COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
         working-directory: ./terraform
 
+      # Step 9: Init RDS Database
+      - name: Initialize Database
+        run: |
+          curl  -X POST https://stock-news-analyzer-rest-api.us-east-1.amazonaws.com/prod/init \
+                -H "Content-Type: application/json"
+                -d ''
+
       # Step 9: Install npm
       - name: Install npm
         run: npm ci
