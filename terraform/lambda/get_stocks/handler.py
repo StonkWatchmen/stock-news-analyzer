@@ -3,8 +3,10 @@ import json
 import pymysql
 import urllib.request, urllib.parse
 from decimal import Decimal
+import boto3
 
 
+comprehend = boto3.client('comprehend')
 DB_HOST = os.environ['DB_HOST']
 DB_USER = os.environ['DB_USER']
 DB_PASS = os.environ['DB_PASS']
@@ -125,6 +127,86 @@ def _fetch_alpha_vantage_quote(symbol: str):
 
 
 
+def _fetch_alpha_vantage_news_sentiment(symbol: str):
+    """
+    Call Alpha Vantage NEWS_SENTIMENT for a single ticker and return
+    an aggregate sentiment score + label.
+    """
+    if not ALPHA_VANTAGE_KEY:
+        return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
+
+    base = "https://www.alphavantage.co/query"
+    qs = urllib.parse.urlencode(
+        {
+            "function": "NEWS_SENTIMENT",
+            "tickers": symbol,
+            "apikey": ALPHA_VANTAGE_KEY,
+        }
+    )
+    try:
+        data = _http_get_json(f"{base}?{qs}")
+    except Exception as e:
+        return {"ticker": symbol, "error": f"HTTP error: {e}"}
+
+    feed = data.get("feed", [])
+    if not feed:
+        return {"ticker": symbol, "sentiment_score": None, "sentiment_label": None}
+
+    scores = []
+
+    # Use the per-ticker sentiment scores in each article
+    for article in feed:
+        for ts in article.get("ticker_sentiment", []):
+            if ts.get("ticker") == symbol:
+                try:
+                    scores.append(float(ts.get("ticker_sentiment_score", 0.0)))
+                except Exception:
+                    continue
+
+    # Fallback: use overall article scores if per-ticker scores not found
+    if not scores:
+        for article in feed:
+            try:
+                s = float(article.get("overall_sentiment_score", 0.0))
+                scores.append(s)
+            except Exception:
+                continue
+
+    if not scores:
+        return {"ticker": symbol, "sentiment_score": None, "sentiment_label": None}
+
+    avg = sum(scores) / len(scores)
+
+    # Map score to label using Alpha Vantage docs
+    if avg <= -0.35:
+        label = "Bearish"
+    elif avg < -0.15:
+        label = "Somewhat-Bearish"
+    elif avg < 0.15:
+        label = "Neutral"
+    elif avg < 0.35:
+        label = "Somewhat-Bullish"
+    else:
+        label = "Bullish"
+
+    return {
+        "ticker": symbol,
+        "sentiment_score": avg,
+        "sentiment_label": label,
+    }
+
+
+def _fetch_news_sentiment_for_tickers(tickers):
+    out = []
+    for t in tickers:
+        t = t.strip().upper()
+        if not t:
+            continue
+        out.append(_fetch_alpha_vantage_news_sentiment(t))
+    return out
+
+
+
 def _fetch_quotes_live(tickers):
     out = []
     for t in tickers:
@@ -238,23 +320,30 @@ def lambda_handler(event, context):
             return _resp(200, {"user_id": int(user_id), "tickers": tickers})
         
 
-        # ---- GET /quotes?tickers=AAPL,MSFT
+
+        # ---- GET /quotes?tickers=AAPL,MSFT  (returns sentiment)
         if path.endswith("/quotes") and method == "GET":
             qs = event.get("queryStringParameters") or {}
-            tickers = [t.strip().upper() for t in (qs.get("tickers", "").split(",")) if t.strip()]
+            tickers = [
+                t.strip().upper()
+                for t in (qs.get("tickers", "").split(","))
+                if t.strip()
+            ]
             if not tickers:
                 conn.close()
-                return _resp(400, {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"})
-            cached = _get_cached_quotes(conn, tickers)
-            have = {r["ticker"] for r in cached}
-            need = [t for t in tickers if t not in have]
-            fresh = _fetch_quotes_live(need) if need else []
-            if fresh:
-                _upsert_prices(conn, fresh)
-            out = sorted(cached + fresh, key=lambda r: r["ticker"])
+                return _resp(
+                    400,
+                    {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
+                )
+
+            # We don't need the DB for sentiment; close it now.
             conn.close()
-            return _resp(200, {"quotes": out})
-        
+
+            sentiments = _fetch_news_sentiment_for_tickers(tickers)
+            # shape: [{ticker, sentiment_score, sentiment_label, ...}, ...]
+
+            return _resp(200, {"quotes": sentiments})
+
 
 
         # body for POST/DELETE

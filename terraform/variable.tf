@@ -26,6 +26,6 @@ variable "alpha_vantage_key" {
 
 variable "api_stage" {
   type        = string
-  default     = "prod"   # change if stage is different
+  default     = "prod" # change if stage is different
   description = "API Gateway stage name"
 }
