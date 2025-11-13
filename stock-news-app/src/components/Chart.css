@@ -1,0 +1,32 @@
+.chart-container {
+    width: 100%;
+    max-width: 700px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 28px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  
+  .chart-container:hover {
+    background: var(--surface-hover);
+    transform: translateY(-2px);
+  }
+  
+  .chart-title {
+    margin-top: 0;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: var(--accent);
+    text-shadow: 0 0 12px rgba(0, 196, 107, 0.3);
+    text-align: center;
+  }
+  
+  .chart-wrapper {
+    width: 100%;
+    height: 400px;
+    position: relative;
+  }
+  
