@@ -189,33 +189,52 @@ export default function Watchlist() {
             </div>
 
             <ul className="watchlist-items">
-                {items.map((t) => {
+            {items.map((t) => {
                 const q = quotes.find((x) => x.ticker === t) || {};
-                const pct = q.change_pct;
+
+                const score = q.sentiment_score;              // number, -1 to 1
+                const label = q.sentiment_label || null;      // "Bullish", "Bearish", etc.
+                const errorMsg = q.error;
+
+                const sentimentLabel = label || (errorMsg ? "Error" : "—");
+                const sentimentPct =
+                typeof score === "number" ? `${(score * 100).toFixed(1)}%` : "—";
+
+                // Determine CSS class based on sentiment label
+                const sentimentClass =
+                label === "Bullish" || label === "Somewhat-Bullish"
+                    ? "up"
+                    : label === "Bearish" || label === "Somewhat-Bearish"
+                    ? "down"
+                    : "";
 
                 return (
-                    <li key={t} className="watchlist-item">
+                <li key={t} className="watchlist-item">
                     <span className="ticker">{t}</span>
 
                     <div className="watchlist-values">
-                        <span className="price">
-                        {q.price != null ? `$${q.price.toFixed(2)}` : "—"}
-                        </span>
-                        <span className={`pct ${pct == null ? "" : pct >= 0 ? "up" : "down"}`}>
-                        {pct != null ? `${pct.toFixed(2)}%` : "—"}
-                        </span>
+                    {/* Left column: sentiment label */}
+                    <span className="price">
+                        {sentimentLabel}
+                    </span>
+
+                    {/* Right column: sentiment score as % */}
+                    <span className={`pct ${sentimentClass}`}>
+                        {errorMsg ? "—" : sentimentPct}
+                    </span>
                     </div>
 
                     <button
-                        className="remove-btn"
-                        onClick={() => handleRemove(t)}
-                        title="Remove this ticker"
+                    className="remove-btn"
+                    onClick={() => handleRemove(t)}
+                    title="Remove this ticker"
                     >
-                        x
+                    x
                     </button>
-                    </li>
+                </li>
                 );
-                })}
+            })}
+
             </ul> 
         </div>
     );
