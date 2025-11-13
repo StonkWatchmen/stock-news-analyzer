@@ -8,7 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import "./chart.css";
+import "./Chart.css";
 
 
 export default function Chart() {
