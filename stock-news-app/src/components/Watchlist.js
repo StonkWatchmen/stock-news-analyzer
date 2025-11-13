@@ -71,12 +71,21 @@ export default function Watchlist() {
         });
     }     
 
+
+    // Fetch quotes for a list of tickers and update state
     async function fetchQuotesFor(list) {
-        if (!API_BASE || !list.length) { setQuotes([]); return; }
-            const qs = encodeURIComponent(list.join(","));
+        if(!list.length){
+            setQuotes([]);
+            return;
+        }
+        if(!API_BASE){
+            console.error("Missing REACT_APP_API_BASE. Prices cannnot be loaded");
+            return;
+        }
+        const qs = encodeURIComponent(list.join(","));
         try {
             const res = await fetch(`${API_BASE}/quotes?tickers=${qs}`);
-        if (!res.ok) throw new Error(`quotes ${res.status}`);
+            if (!res.ok) throw new Error(`quotes ${res.status}`);
             const data = await res.json();
             setQuotes(data.quotes || []);
         } catch (e) {
