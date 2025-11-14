@@ -165,28 +165,6 @@ resource "aws_api_gateway_integration" "delete_watchlist_lambda_integration" {
   uri                     = aws_lambda_function.get_stocks_lambda.invoke_arn
 }
 
-resource "aws_api_gateway_resource" "quotes" {
-  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  parent_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.root_resource_id
-  path_part   = "quotes"
-}
-
-resource "aws_api_gateway_method" "get_quotes" {
-  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id   = aws_api_gateway_resource.quotes.id
-  http_method   = "GET"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "get_quotes_lambda_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id             = aws_api_gateway_resource.quotes.id
-  http_method             = aws_api_gateway_method.get_quotes.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.get_stocks_lambda.invoke_arn
-}
-
 resource "aws_lambda_permission" "apigw_invoke" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
@@ -217,6 +195,31 @@ resource "aws_lambda_function" "init_rds_lambda" {
     security_group_ids = [aws_security_group.lambda_sg.id]
   }
 }
+
+resource "aws_lambda_function" "init_db_lambda" {
+
+  function_name = "init-db-lambda"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.11"
+
+  filename = data.archive_file.init_zip.output_path
+
+  environment {
+    variables = {
+      DB_HOST           = aws_db_instance.stock_news_analyzer_db.address
+      DB_USER           = var.db_username
+      DB_PASS           = var.db_password
+      DB_NAME           = "stocknewsanalyzerdb"
+    }
+  }
+
+  vpc_config {
+    subnet_ids         = [aws_subnet.private_subnet.id]
+    security_group_ids = [aws_security_group.lambda_sg.id]
+  }
+}
+
 
 resource "aws_api_gateway_resource" "init_rds_resource" {
   rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id

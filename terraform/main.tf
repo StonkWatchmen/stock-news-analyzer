@@ -172,13 +172,28 @@ resource "aws_cognito_user_pool_domain" "auth_domain" {
   user_pool_id = aws_cognito_user_pool.user_pool.id
 }
 
-resource "null_resource" "package_lambda" {
+resource "null_resource" "package_lambda_stocks" {
   provisioner "local-exec" {
     command = <<EOT
       rm -rf ${path.module}/build
       mkdir -p ${path.module}/build
       cp ${path.module}/lambda/get_stocks/handler.py ${path.module}/build/
       pip install -r ${path.module}/lambda/get_stocks/requirements.txt -t ${path.module}/build/
+    EOT
+  }
+
+  triggers = {
+    always_run = timestamp()
+  }
+}
+
+resource "null_resource" "package_lambda_init" {
+  provisioner "local-exec" {
+    command = <<EOT
+      rm -rf ${path.module}/build
+      mkdir -p ${path.module}/build
+      cp ${path.module}/lambda/init_rds/handler.py ${path.module}/build/
+      pip install -r ${path.module}/lambda/init_rds/requirements.txt -t ${path.module}/build/
     EOT
   }
 
