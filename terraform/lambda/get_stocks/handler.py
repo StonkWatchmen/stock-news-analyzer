@@ -37,6 +37,7 @@ def get_db_connection():
     
 def _resp(status, body):
     return {
+        "isBase64Encoded": False,
         "statusCode": status,
         "headers": {
             "Content-Type": "application/json",
