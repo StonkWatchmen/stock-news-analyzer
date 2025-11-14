@@ -3,6 +3,7 @@ import json
 import pymysql
 import urllib.request, urllib.parse
 from decimal import Decimal
+from datetime import datetime, date
 import boto3
 
 
@@ -12,6 +13,17 @@ DB_USER = os.environ['DB_USER']
 DB_PASS = os.environ['DB_PASS']
 DB_NAME = os.environ['DB_NAME']
 ALPHA_VANTAGE_KEY = os.environ.get('ALPHA_VANTAGE_KEY')  
+
+
+# Custom JSON encoder to handle Decimal and datetime objects
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        return super().default(obj)
+
 
 def get_db_connection():
     return pymysql.connect(
@@ -32,7 +44,7 @@ def _resp(status, body):
             "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",            
         },
-        "body": json.dumps(body),
+        "body": json.dumps(body, cls=CustomJSONEncoder),
     } 
 
 def list_stocks(conn):
@@ -260,6 +272,7 @@ def lambda_handler(event, context):
     path = event.get("path", "/")
     method = event.get("httpMethod", "GET")
 
+    conn = None
     try:
         conn = get_db_connection()
     except Exception as e:
