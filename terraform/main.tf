@@ -192,7 +192,10 @@ resource "null_resource" "package_lambda_init" {
     command = <<EOT
       rm -rf ${path.module}/build
       mkdir -p ${path.module}/build
+
       cp ${path.module}/lambda/init_rds/handler.py ${path.module}/build/
+      cp -r ${path.module}/sql ${path.module}/build/sql
+
       pip install -r ${path.module}/lambda/init_rds/requirements.txt -t ${path.module}/build/
     EOT
   }
