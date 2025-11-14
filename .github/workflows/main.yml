@@ -101,7 +101,7 @@ jobs:
       - name: Initialize Database
         run: |
           aws lambda invoke \
-          --function-name init_db_lambda \
+          --function-name init-db-lambda \
           response.json
 
       # Step 9: Install npm
