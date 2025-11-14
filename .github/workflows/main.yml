@@ -111,8 +111,8 @@ jobs:
         working-directory: ./stock-news-app
 
       # Step 10: Install dependencies
-      - name: Install Cognito Identity SDK and React Router Dom
-        run: npm install amazon-cognito-identity-js react-router-dom@6
+      - name: Install Cognito Identity SDK, React Router Dom, and Recharts
+        run: npm install amazon-cognito-identity-js react-router-dom@6 recharts
         working-directory: ./stock-news-app
 
       # Step 11: Build React app
