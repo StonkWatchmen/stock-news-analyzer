@@ -37,7 +37,7 @@ def _resp(status, body):
 
 def list_stocks(conn):
     with conn.cursor() as cursor:
-        cursor.execute("SELECT id, ticker FROM stocks ORDER BY ticker;")
+        cursor.execute("SELECT * FROM stocks ORDER BY ticker;")
         return cursor.fetchall()
 
 def get_watchlist(conn, user_id):
@@ -103,7 +103,6 @@ def _http_get_json(url):
 
 def _fetch_alpha_vantage_quote(symbol: str):
     if not ALPHA_VANTAGE_KEY:
-        # return graceful error so UI can show message
         return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
     base = "https://www.alphavantage.co/query"
     qs = urllib.parse.urlencode(
@@ -128,10 +127,6 @@ def _fetch_alpha_vantage_quote(symbol: str):
 
 
 def _fetch_alpha_vantage_news_sentiment(symbol: str):
-    """
-    Call Alpha Vantage NEWS_SENTIMENT for a single ticker and return
-    an aggregate sentiment score + label.
-    """
     if not ALPHA_VANTAGE_KEY:
         return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
 
@@ -154,7 +149,6 @@ def _fetch_alpha_vantage_news_sentiment(symbol: str):
 
     scores = []
 
-    # Use the per-ticker sentiment scores in each article
     for article in feed:
         for ts in article.get("ticker_sentiment", []):
             if ts.get("ticker") == symbol:
@@ -163,7 +157,6 @@ def _fetch_alpha_vantage_news_sentiment(symbol: str):
                 except Exception:
                     continue
 
-    # Fallback: use overall article scores if per-ticker scores not found
     if not scores:
         for article in feed:
             try:
@@ -177,7 +170,6 @@ def _fetch_alpha_vantage_news_sentiment(symbol: str):
 
     avg = sum(scores) / len(scores)
 
-    # Map score to label using Alpha Vantage docs
     if avg <= -0.35:
         label = "Bearish"
     elif avg < -0.15:
@@ -261,67 +253,34 @@ def _get_cached_quotes(conn, tickers):
     ]
 
 
-
 def lambda_handler(event, context):
-    # """
-    # Handles API Gateway requests and returns a JSON response.
-    # """
-    # try:
-    #     conn = get_db_connection()
-    #     with conn.cursor() as cursor:
-    #         cursor.execute("SELECT * FROM stocks;")
-    #         result = cursor.fetchall()
-
-    #     conn.close()
-
-    #     return {
-    #         "statusCode": 200,
-    #         "body": json.dumps({
-    #             "message": "DB connection successful",
-    #             "stocks": result
-    #         })
-    #     }
-
-    # except Exception as e:
-    #     return {
-    #         "statusCode": 500,
-    #         "body": json.dumps({
-    #             "error": str(e)
-    #         })
-    #     }
-    
     if event.get("httpMethod") == "OPTIONS":
         return _resp(200, {"ok": True})
-    
+
     path = event.get("path", "/")
     method = event.get("httpMethod", "GET")
-        
+
     try:
         conn = get_db_connection()
     except Exception as e:
-        return _resp(500, {"error", f"DB connection failed: {str(e)}"})
-    
+        return _resp(500, {"error": f"DB connection failed: {str(e)}"})
+
     try:
         # GET /stocks
         if path.endswith("/stocks") and method == "GET":
             rows = list_stocks(conn)
-            conn.close()
             return _resp(200, {"stocks": rows})
-        
+
         # GET /watchlist?user_id=1
         if path.endswith("/watchlist") and method == "GET":
             qs = event.get("queryStringParameters") or {}
             user_id = qs.get("user_id")
             if not user_id:
-                conn.close()
                 return _resp(400, {"error": "user_id is required"})
             tickers = get_watchlist(conn, user_id)
-            conn.close()
             return _resp(200, {"user_id": int(user_id), "tickers": tickers})
-        
 
-
-        # ---- GET /quotes?tickers=AAPL,MSFT  (returns sentiment)
+        # GET /quotes?tickers=AAPL,MSFT
         if path.endswith("/quotes") and method == "GET":
             qs = event.get("queryStringParameters") or {}
             tickers = [
@@ -330,21 +289,13 @@ def lambda_handler(event, context):
                 if t.strip()
             ]
             if not tickers:
-                conn.close()
                 return _resp(
                     400,
                     {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
                 )
 
-            # We don't need the DB for sentiment; close it.
-            conn.close()
-
             sentiments = _fetch_news_sentiment_for_tickers(tickers)
-            # shape: [{ticker, sentiment_score, sentiment_label, ...}, ...]
-
             return _resp(200, {"quotes": sentiments})
-
-
 
         # body for POST/DELETE
         body = {}
@@ -359,11 +310,9 @@ def lambda_handler(event, context):
             user_id = body.get("user_id")
             ticker = body.get("ticker")
             if not user_id or not ticker:
-                conn.close()
                 return _resp(400, {"error": "user_id and ticker are required"})
             ticker = ticker.strip().upper()
             add_to_watchlist(conn, int(user_id), ticker)
-            conn.close()
             return _resp(200, {"message": "added", "ticker": ticker})
         
         # DELETE /watchlist
@@ -371,17 +320,16 @@ def lambda_handler(event, context):
             user_id = body.get("user_id")
             ticker = body.get("ticker")
             if not user_id or not ticker:
-                conn.close()
                 return _resp(400, {"error": "user_id and ticker are required"})
             ticker = ticker.strip().upper()
             remove_from_watchlist(conn, int(user_id), ticker)
-            conn.close()
             return _resp(200, {"message": "removed", "ticker": ticker})
         
-        conn.close()
         return _resp(404, {"error": "not found", "path": path, "method": method})             
     
     except Exception as e:
-        conn.close()
         return _resp(500, {"error": str(e)})    
-                 
+                  
+    finally:
+        if conn:
+            conn.close()
