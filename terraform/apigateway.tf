@@ -106,7 +106,7 @@ resource "aws_lambda_function" "get_stocks_lambda" {
   function_name = "get-stocks-lambda"
   role          = aws_iam_role.lambda_role.arn
   handler       = "handler.lambda_handler"
-  runtime       = "python3.11"
+  runtime       = "python3.12"
 
   filename = data.archive_file.get_stocks_zip.output_path
 
@@ -201,7 +201,7 @@ resource "aws_lambda_function" "init_db_lambda" {
   function_name = "init-db-lambda"
   role          = aws_iam_role.lambda_role.arn
   handler       = "handler.lambda_handler"
-  runtime       = "python3.11"
+  runtime       = "python3.12"
 
   filename = data.archive_file.init_zip.output_path
 
