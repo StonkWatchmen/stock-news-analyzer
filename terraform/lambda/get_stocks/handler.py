@@ -5,6 +5,7 @@ import urllib.request, urllib.parse
 from decimal import Decimal
 from datetime import datetime, date
 import boto3
+import traceback  # <--- added for debugging unexpected errors
 
 
 comprehend = boto3.client('comprehend')
@@ -137,8 +138,6 @@ def _fetch_alpha_vantage_quote(symbol: str):
     return {"ticker": symbol, "price": price, "change_pct": change_pct}
 
 
-
-
 def _fetch_alpha_vantage_news_sentiment(symbol: str):
     if not ALPHA_VANTAGE_KEY:
         return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
@@ -211,7 +210,6 @@ def _fetch_news_sentiment_for_tickers(tickers):
     return out
 
 
-
 def _fetch_quotes_live(tickers):
     out = []
     for t in tickers:
@@ -267,83 +265,88 @@ def _get_cached_quotes(conn, tickers):
 
 
 def lambda_handler(event, context):
-    if event.get("httpMethod") == "OPTIONS":
-        return _resp(200, {"ok": True})
-
-    path = event.get("path", "/")
-    method = event.get("httpMethod", "GET")
-
-    conn = None
     try:
-        conn = get_db_connection()
+        if event.get("httpMethod") == "OPTIONS":
+            return _resp(200, {"ok": True})
+
+        path = event.get("path", "/")
+        method = event.get("httpMethod", "GET")
+
+        conn = None
+        try:
+            conn = get_db_connection()
+        except Exception as e:
+            return _resp(500, {"error": f"DB connection failed: {str(e)}"})
+
+        try:
+            # GET /stocks
+            if path.endswith("/stocks") and method == "GET":
+                rows = list_stocks(conn)
+                return _resp(200, {"stocks": rows})
+
+            # GET /watchlist?user_id=1
+            if path.endswith("/watchlist") and method == "GET":
+                qs = event.get("queryStringParameters") or {}
+                user_id = qs.get("user_id")
+                if not user_id:
+                    return _resp(400, {"error": "user_id is required"})
+                tickers = get_watchlist(conn, user_id)
+                return _resp(200, {"user_id": int(user_id), "tickers": tickers})
+
+            # GET /quotes?tickers=AAPL,MSFT
+            if path.endswith("/quotes") and method == "GET":
+                qs = event.get("queryStringParameters") or {}
+                tickers = [
+                    t.strip().upper()
+                    for t in (qs.get("tickers", "").split(","))
+                    if t.strip()
+                ]
+                if not tickers:
+                    return _resp(
+                        400,
+                        {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
+                    )
+
+                sentiments = _fetch_news_sentiment_for_tickers(tickers)
+                return _resp(200, {"quotes": sentiments})
+
+            # body for POST/DELETE
+            body = {}
+            if event.get("body"):
+                try:
+                    body = json.loads(event["body"])
+                except json.JSONDecodeError:
+                    body = {}
+            
+            # POST /watchlist
+            if path.endswith("/watchlist") and method == "POST":
+                user_id = body.get("user_id")
+                ticker = body.get("ticker")
+                if not user_id or not ticker:
+                    return _resp(400, {"error": "user_id and ticker are required"})
+                ticker = ticker.strip().upper()
+                add_to_watchlist(conn, int(user_id), ticker)
+                return _resp(200, {"message": "added", "ticker": ticker})
+            
+            # DELETE /watchlist
+            if path.endswith("/watchlist") and method == "DELETE":
+                user_id = body.get("user_id")
+                ticker = body.get("ticker")
+                if not user_id or not ticker:
+                    return _resp(400, {"error": "user_id and ticker are required"})
+                ticker = ticker.strip().upper()
+                remove_from_watchlist(conn, int(user_id), ticker)
+                return _resp(200, {"message": "removed", "ticker": ticker})
+            
+            return _resp(404, {"error": "not found", "path": path, "method": method})             
+        
+        except Exception as e:
+            return _resp(500, {"error": str(e)})
+        
+        finally:
+            if conn:
+                conn.close()
+
     except Exception as e:
-        return _resp(500, {"error": f"DB connection failed: {str(e)}"})
-
-    try:
-        # GET /stocks
-        if path.endswith("/stocks") and method == "GET":
-            rows = list_stocks(conn)
-            return _resp(200, {"stocks": rows})
-
-        # GET /watchlist?user_id=1
-        if path.endswith("/watchlist") and method == "GET":
-            qs = event.get("queryStringParameters") or {}
-            user_id = qs.get("user_id")
-            if not user_id:
-                return _resp(400, {"error": "user_id is required"})
-            tickers = get_watchlist(conn, user_id)
-            return _resp(200, {"user_id": int(user_id), "tickers": tickers})
-
-        # GET /quotes?tickers=AAPL,MSFT
-        if path.endswith("/quotes") and method == "GET":
-            qs = event.get("queryStringParameters") or {}
-            tickers = [
-                t.strip().upper()
-                for t in (qs.get("tickers", "").split(","))
-                if t.strip()
-            ]
-            if not tickers:
-                return _resp(
-                    400,
-                    {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
-                )
-
-            sentiments = _fetch_news_sentiment_for_tickers(tickers)
-            return _resp(200, {"quotes": sentiments})
-
-        # body for POST/DELETE
-        body = {}
-        if event.get("body"):
-            try:
-                body = json.loads(event["body"])
-            except json.JSONDecodeError:
-                body = {}
-        
-        # POST /watchlist
-        if path.endswith("/watchlist") and method == "POST":
-            user_id = body.get("user_id")
-            ticker = body.get("ticker")
-            if not user_id or not ticker:
-                return _resp(400, {"error": "user_id and ticker are required"})
-            ticker = ticker.strip().upper()
-            add_to_watchlist(conn, int(user_id), ticker)
-            return _resp(200, {"message": "added", "ticker": ticker})
-        
-        # DELETE /watchlist
-        if path.endswith("/watchlist") and method == "DELETE":
-            user_id = body.get("user_id")
-            ticker = body.get("ticker")
-            if not user_id or not ticker:
-                return _resp(400, {"error": "user_id and ticker are required"})
-            ticker = ticker.strip().upper()
-            remove_from_watchlist(conn, int(user_id), ticker)
-            return _resp(200, {"message": "removed", "ticker": ticker})
-        
-        return _resp(404, {"error": "not found", "path": path, "method": method})             
-    
-    except Exception as e:
-        return _resp(500, {"error": str(e)})    
-                  
-    finally:
-        if conn:
-            conn.close()
+        # Catch any unexpected error and ensure valid Lambda proxy response
+        return _resp(500, {"error": "Unhandled exception", "trace": traceback.format_exc()})
