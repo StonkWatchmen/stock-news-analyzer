@@ -194,7 +194,7 @@ export default function Watchlist() {
 
                 const price = q.price;                        // number or undefined
                 const changePct = q.change_pct;               // number or undefined
-                const score = q.sentiment_score;              // number, -1 to 1
+                //const score = q.sentiment_score;              // number, -1 to 1
                 const label = q.sentiment_label || null;      // "Bullish", "Bearish", etc.
                 const errorMsg = q.error;
 
