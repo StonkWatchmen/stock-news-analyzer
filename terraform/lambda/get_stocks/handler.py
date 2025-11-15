@@ -306,9 +306,26 @@ def lambda_handler(event, context):
                         400,
                         {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
                     )
-
+                    
+                # First try to get cached prices
+                cached_prices = _get_cached_quotes(conn, tickers)
                 sentiments = _fetch_news_sentiment_for_tickers(tickers)
-                return _resp(200, {"quotes": sentiments})
+                
+                # Merge the two data sources
+                quotes = []
+                for sentiment in sentiments:
+                    ticker = sentiment["ticker"]
+                    price_data = next((p for p in cached_prices if p["ticker"] == ticker), {})
+                    quotes.append({
+                        "ticker": ticker,
+                        "price": price_data.get("price"),
+                        "change_pct": price_data.get("change_pct"),
+                        "sentiment_score": sentiment.get("sentiment_score"),
+                        "sentiment_label": sentiment.get("sentiment_label"),
+                        "error": sentiment.get("error"),
+                    })
+                    
+                return _resp(200, {"quotes": quotes})
 
             # body for POST/DELETE
             body = {}

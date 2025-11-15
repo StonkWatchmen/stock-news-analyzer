@@ -192,15 +192,22 @@ export default function Watchlist() {
             {items.map((t) => {
                 const q = quotes.find((x) => x.ticker === t) || {};
 
+                const price = q.price;                        // number or undefined
+                const changePct = q.change_pct;               // number or undefined
                 const score = q.sentiment_score;              // number, -1 to 1
                 const label = q.sentiment_label || null;      // "Bullish", "Bearish", etc.
                 const errorMsg = q.error;
 
+                const priceDisplay = price !== null && price !== undefined 
+                    ? `$${price.toFixed(2)}` 
+                    : "—";
+                const changePctDisplay = changePct !== null && changePct !== undefined
+                    ? `${changePct > 0 ? "+" : ""}${changePct.toFixed(2)}%`
+                    : "—";
                 const sentimentLabel = label || (errorMsg ? "Error" : "—");
-                const sentimentPct =
-                typeof score === "number" ? `${(score * 100).toFixed(1)}%` : "—";
 
-                // Determine CSS class based on sentiment label
+                // Determine CSS class based on price change and sentiment
+                const priceClass = changePct > 0 ? "up" : changePct < 0 ? "down" : "";
                 const sentimentClass =
                 label === "Bullish" || label === "Somewhat-Bullish"
                     ? "up"
@@ -209,29 +216,34 @@ export default function Watchlist() {
                     : "";
 
                 return (
-                <li key={t} className="watchlist-item">
-                    <span className="ticker">{t}</span>
+                    <li key={t} className="watchlist-item">
+                        <span className="ticker">{t}</span>
 
-                    <div className="watchlist-values">
-                    {/* Left column: sentiment label */}
-                    <span className="price">
-                        {sentimentLabel}
-                    </span>
+                        <div className="watchlist-values">
+                        {/* Price section */}
+                        <span className={`price ${priceClass}`}>
+                            {priceDisplay}
+                        </span>
 
-                    {/* Right column: sentiment score as % */}
-                    <span className={`pct ${sentimentClass}`}>
-                        {errorMsg ? "—" : sentimentPct}
-                    </span>
-                    </div>
+                        {/* Change percent section */}
+                        <span className={`pct ${priceClass}`}>
+                            {changePctDisplay}
+                        </span>
 
-                    <button
-                    className="remove-btn"
-                    onClick={() => handleRemove(t)}
-                    title="Remove this ticker"
-                    >
-                    x
-                    </button>
-                </li>
+                        {/* Sentiment section */}
+                        <span className={`sentiment ${sentimentClass}`}>
+                            {sentimentLabel}
+                        </span>
+                        </div>
+
+                        <button
+                            className="remove-btn"
+                            onClick={() => handleRemove(t)}
+                            title="Remove this ticker"
+                        >
+                            x
+                        </button>
+                    </li>
                 );
             })}
 
