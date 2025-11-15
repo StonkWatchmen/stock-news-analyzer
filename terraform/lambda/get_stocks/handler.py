@@ -307,22 +307,39 @@ def lambda_handler(event, context):
                         {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
                     )
                     
-                # First try to get cached prices
+                # Get cached prices first
                 cached_prices = _get_cached_quotes(conn, tickers)
-                sentiments = _fetch_news_sentiment_for_tickers(tickers)
+                cached_tickers = {p["ticker"] for p in cached_prices}
                 
-                # Merge the two data sources
+                # Fetch live prices for tickers not in cache
+                uncached_tickers = [t for t in tickers if t not in cached_tickers]
+                live_prices = _fetch_quotes_live(uncached_tickers) if uncached_tickers else []
+                
+                # Cache the live prices we just fetched
+                if live_prices:
+                    _upsert_prices(conn, live_prices)
+                
+                # Combine cached and live prices
+                all_prices = cached_prices + live_prices
+                prices_map = {p["ticker"]: p for p in all_prices}
+                
+                # Fetch sentiment data
+                sentiments = _fetch_news_sentiment_for_tickers(tickers)
+                sentiments_map = {s["ticker"]: s for s in sentiments}
+                
+                # Build quotes for all requested tickers
                 quotes = []
-                for sentiment in sentiments:
-                    ticker = sentiment["ticker"]
-                    price_data = next((p for p in cached_prices if p["ticker"] == ticker), {})
+                for ticker in tickers:
+                    price_data = prices_map.get(ticker, {})
+                    sentiment_data = sentiments_map.get(ticker, {})
+                    
                     quotes.append({
                         "ticker": ticker,
                         "price": price_data.get("price"),
                         "change_pct": price_data.get("change_pct"),
-                        "sentiment_score": sentiment.get("sentiment_score"),
-                        "sentiment_label": sentiment.get("sentiment_label"),
-                        "error": sentiment.get("error"),
+                        "sentiment_score": sentiment_data.get("sentiment_score"),
+                        "sentiment_label": sentiment_data.get("sentiment_label"),
+                        "error": sentiment_data.get("error"),
                     })
                     
                 return _resp(200, {"quotes": quotes})
