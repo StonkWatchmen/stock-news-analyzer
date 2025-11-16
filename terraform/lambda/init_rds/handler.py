@@ -47,11 +47,31 @@ def lambda_handler(event, context):
                 print(f"Warning: {filepath} not found.")
 
         print("Database initialization complete.")
-        return {"status": "success"}
+        return {
+        "isBase64Encoded": False,
+        "statusCode": 200,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            },
+        "body": '{"status":"success"}'
+        }
 
     except Exception as e:
         print(f"Error initializing MySQL database: {e}")
-        return {"status": "error", "message": str(e)}
+        return {
+            "isBase64Encoded": False,
+            "statusCode": 500,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+            },
+            "body": '{"status":"error","message":"' + str(e) + '"}'
+        }
 
     finally:
         if 'conn' in locals() and conn:
