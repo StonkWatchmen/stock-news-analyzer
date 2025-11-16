@@ -306,44 +306,25 @@ def lambda_handler(event, context):
                         400,
                         {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
                     )
-                    
-                # Get cached prices first
-                cached_prices = _get_cached_quotes(conn, tickers)
-                cached_tickers = {p["ticker"] for p in cached_prices}
-                
-                # Fetch live prices for tickers not in cache
-                uncached_tickers = [t for t in tickers if t not in cached_tickers]
-                live_prices = _fetch_quotes_live(uncached_tickers) if uncached_tickers else []
-                
-                # Cache the live prices we just fetched
-                if live_prices:
-                    _upsert_prices(conn, live_prices)
-                
-                # Combine cached and live prices
-                all_prices = cached_prices + live_prices
-                prices_map = {p["ticker"]: p for p in all_prices}
-                
-                # Fetch sentiment data
+
+                # Only fetch sentiment – no DB reads/writes, no `prices` table
                 sentiments = _fetch_news_sentiment_for_tickers(tickers)
                 sentiments_map = {s["ticker"]: s for s in sentiments}
-                
-                # Build quotes for all requested tickers
+
                 quotes = []
                 for ticker in tickers:
-                    price_data = prices_map.get(ticker, {})
-                    sentiment_data = sentiments_map.get(ticker, {})
-                    
+                    s = sentiments_map.get(ticker, {}) or {}
                     quotes.append({
                         "ticker": ticker,
-                        "price": price_data.get("price"),
-                        "change_pct": price_data.get("change_pct"),
-                        "sentiment_score": sentiment_data.get("sentiment_score"),
-                        "sentiment_label": sentiment_data.get("sentiment_label"),
-                        "error": sentiment_data.get("error"),
+                        # keep these fields for frontend compatibility, but they’re always None
+                        "price": None,
+                        "change_pct": None,
+                        "sentiment_score": s.get("sentiment_score"),
+                        "sentiment_label": s.get("sentiment_label"),
+                        "error": s.get("error"),
                     })
-                    
-                return _resp(200, {"quotes": quotes})
 
+                return _resp(200, {"quotes": quotes})
             # body for POST/DELETE
             body = {}
             if event.get("body"):
