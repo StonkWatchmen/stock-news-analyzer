@@ -163,7 +163,8 @@ resource "aws_lambda_function" "get_stocks_lambda" {
   handler       = "handler.lambda_handler"
   runtime       = "python3.12"
 
-  filename = data.archive_file.get_stocks_zip.output_path
+  filename         = data.archive_file.get_stocks_zip.output_path
+  source_code_hash = data.archive_file.get_stocks_zip.output_base64sha256
 
   environment {
     variables = {
@@ -187,7 +188,8 @@ resource "aws_lambda_function" "init_db_lambda" {
   handler       = "handler.lambda_handler"
   runtime       = "python3.12"
 
-  filename = data.archive_file.init_zip.output_path
+  filename         = data.archive_file.init_rds_zip.output_path
+  source_code_hash = data.archive_file.init_rds_zip.output_base64sha256
 
   environment {
     variables = {

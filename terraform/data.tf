@@ -49,13 +49,13 @@ data "aws_iam_policy_document" "get_object_iam_policy" {
 data "archive_file" "get_stocks_zip" {
   depends_on  = [null_resource.package_lambda_stocks]
   type        = "zip"
-  source_dir  = "${path.module}/build"
+  source_dir  = "${path.module}/build/get_stocks"
   output_path = "${path.module}/get_stocks.zip"
 }
 
-data "archive_file" "init_zip" {
+data "archive_file" "init_rds_zip" {
   depends_on  = [null_resource.package_lambda_init]
   type        = "zip"
-  source_dir  = "${path.module}/build"
+  source_dir  = "${path.module}/build/init_rds"
   output_path = "${path.module}/init_rds.zip"
 }
