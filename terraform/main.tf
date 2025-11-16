@@ -145,6 +145,12 @@ resource "aws_cognito_user_pool" "user_pool" {
       priority = 1
     }
   }
+
+  lambda_config {
+    post_confirmation = aws_lambda_function.add_user.arn
+  }
+
+  depends_on = [aws_lambda_function.add_user]
 }
 resource "aws_cognito_user_pool_client" "web_client" {
   name            = "stock-news-analyzer-client"

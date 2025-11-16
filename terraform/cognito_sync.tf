@@ -38,11 +38,6 @@ resource "null_resource" "package_lambda_add_user" {
   }
 }
 
-resource "aws_cognito_user_pool_lambda_config" "trigger" {
-  user_pool_id      = aws_cognito_user_pool.user_pool.id
-  post_confirmation = aws_lambda_function.add_user_lambda.arn
-}
-
 resource "aws_lambda_permission" "allow_cognito" {
   statement_id = "AllowExecutionFromCognito"
   action        = "lambda:InvokeFunction"
