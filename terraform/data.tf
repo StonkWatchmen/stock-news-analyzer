@@ -59,3 +59,10 @@ data "archive_file" "init_rds_zip" {
   source_dir  = "${path.module}/build/init_rds"
   output_path = "${path.module}/init_rds.zip"
 }
+
+data "archive_file" "add_user_zip" {
+  depends_on  = [null_resource.package_lambda_add_user]
+  type        = "zip"
+  source_dir  = "${path.module}/build/add_user"
+  output_path = "${path.module}/add_user.zip"
+}
