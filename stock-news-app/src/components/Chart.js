@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -12,16 +12,38 @@ import "./Chart.css";
 
 
 export default function Chart() {
-  const data = [
-    { date: "Nov 1", sentiment: 0.1 },
-    { date: "Nov 2", sentiment: 0.3 },
-    { date: "Nov 3", sentiment: -0.2 },
-    { date: "Nov 4", sentiment: 0.4 },
-    { date: "Nov 5", sentiment: 0.6 },
-    { date: "Nov 6", sentiment: 0.2 },
-    { date: "Nov 7", sentiment: -0.1 },
-  ];
+  const [data, setData] = useState([]);
 
+  useEffect(() => {
+    async function load() {
+      if (!API_BASE) {
+        console.error("Missing REACT_APP_API_BASE");
+        return;
+      }
+
+      try {
+        // For now, just pull AAPL sentiment.
+  
+        const res = await fetch(`${API_BASE}/quotes?tickers=AAPL`);
+        const json = await res.json();
+        const quotes = json.quotes || [];
+
+        const chartData = quotes.map((q) => ({
+          // x-axis label; 
+          date: q.ticker,
+          // y-axis value from Lambda's sentiment_score
+          sentiment:
+            typeof q.sentiment_score === "number" ? q.sentiment_score : 0,
+        }));
+
+        setData(chartData);
+      } catch (err) {
+        console.error("Failed to load sentiment", err);
+      }
+    }
+
+    load();
+  }, []);
   return (
     <div className="chart-container">
       <h2 className="chart-title">Stock Sentiment Over Time</h2>
