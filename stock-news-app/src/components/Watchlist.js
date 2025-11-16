@@ -3,7 +3,9 @@ import {getWatchlist, saveWatchlist } from "../utils/storage";
 import "./Watchlist.css"
 
 const TICKER_REGEX = /^[A-Z.-]{1,10}$/;    // Allows ticker patterns like BRK.B, RDS.A, etc.
-const API_BASE = process.env.REACT_APP_API_BASE;
+// const API_BASE = process.env.REACT_APP_API_BASE;
+const API_BASE = process.env.REACT_APP_API_BASE_URL;
+
 const USER_ID = 1; // until Cognito is hooked up
 
 // Keep tickers consistent: trim whitespace and uppercase
@@ -192,48 +194,34 @@ export default function Watchlist() {
             {items.map((t) => {
                 const q = quotes.find((x) => x.ticker === t) || {};
 
-                const price = q.price;                        // number or undefined
-                const changePct = q.change_pct;               // number or undefined
-                //const score = q.sentiment_score;              // number, -1 to 1
+                const score =
+                    typeof q.sentiment_score === "number" ? q.sentiment_score : null;
                 const label = q.sentiment_label || null;      // "Bullish", "Bearish", etc.
                 const errorMsg = q.error;
 
-                const priceDisplay = price !== null && price !== undefined 
-                    ? `$${price.toFixed(2)}` 
-                    : "—";
-                const changePctDisplay = changePct !== null && changePct !== undefined
-                    ? `${changePct > 0 ? "+" : ""}${changePct.toFixed(2)}%`
-                    : "—";
+                const scoreDisplay = score !== null ? score.toFixed(3) : "—";
+
                 const sentimentLabel = label || (errorMsg ? "Error" : "—");
 
-                // Determine CSS class based on price change and sentiment
-                const priceClass = changePct > 0 ? "up" : changePct < 0 ? "down" : "";
                 const sentimentClass =
-                label === "Bullish" || label === "Somewhat-Bullish"
-                    ? "up"
-                    : label === "Bearish" || label === "Somewhat-Bearish"
-                    ? "down"
-                    : "";
+                    score > 0 ? "up" :
+                    score < 0 ? "down" :
+                    "";
 
                 return (
                     <li key={t} className="watchlist-item">
                         <span className="ticker">{t}</span>
 
                         <div className="watchlist-values">
-                        {/* Price section */}
-                        <span className={`price ${priceClass}`}>
-                            {priceDisplay}
-                        </span>
+                            {/* Sentiment numeric score */}
+                            <span className={`sentiment-score ${sentimentClass}`}>
+                                {scoreDisplay}
+                            </span>
 
-                        {/* Change percent section */}
-                        <span className={`pct ${priceClass}`}>
-                            {changePctDisplay}
-                        </span>
-
-                        {/* Sentiment section */}
-                        <span className={`sentiment ${sentimentClass}`}>
-                            {sentimentLabel}
-                        </span>
+                            {/* Sentiment label */}
+                            <span className={`sentiment ${sentimentClass}`}>
+                                {sentimentLabel}
+                            </span>
                         </div>
 
                         <button

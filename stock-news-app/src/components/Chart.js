@@ -10,7 +10,9 @@ import {
 } from "recharts";
 import "./Chart.css";
 
-const API_BASE = process.env.REACT_APP_API_BASE;
+// const API_BASE = process.env.REACT_APP_API_BASE;
+const API_BASE = process.env.REACT_APP_API_BASE_URL;
+
 export default function Chart() {
   const [data, setData] = useState([]);
 
