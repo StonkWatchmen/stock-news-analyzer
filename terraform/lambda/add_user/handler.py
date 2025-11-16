@@ -17,7 +17,7 @@ def get_connection():
 def lambda_handler(event, context):
     conn = get_connection()
 
-    user = event['userName'] 
+    user = event['request']['userAttributes']['sub']
     email = event['request']['userAttributes'].get('email')
 
     with conn.cursor() as cur:
