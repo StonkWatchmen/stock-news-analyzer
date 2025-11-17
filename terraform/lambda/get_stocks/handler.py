@@ -25,17 +25,6 @@ class CustomJSONEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
-
-def get_db_connection():
-    return pymysql.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASS,
-        database=DB_NAME,
-        connect_timeout=5,
-        cursorclass=pymysql.cursors.DictCursor        
-    )
-    
 def _resp(status, body):
     return {
         "isBase64Encoded": False,
@@ -48,6 +37,18 @@ def _resp(status, body):
         },
         "body": json.dumps(body, cls=CustomJSONEncoder),
     } 
+
+
+def get_db_connection():
+    return pymysql.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASS,
+        database=DB_NAME,
+        connect_timeout=5,
+        cursorclass=pymysql.cursors.DictCursor        
+    )
+    
 
 def list_stocks(conn):
     with conn.cursor() as cursor:
@@ -115,27 +116,27 @@ def _http_get_json(url):
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _fetch_alpha_vantage_quote(symbol: str):
-    if not ALPHA_VANTAGE_KEY:
-        return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
-    base = "https://www.alphavantage.co/query"
-    qs = urllib.parse.urlencode(
-        {"function": "GLOBAL_QUOTE", "symbol": symbol, "apikey": ALPHA_VANTAGE_KEY}
-    )
-    data = _http_get_json(f"{base}?{qs}")
-    q = data.get("Global Quote", {})
-    if not q:
-        return {"ticker": symbol, "error": "No quote"}
-    try:
-        price = float(Decimal(q.get("05. price", "0")))
-    except Exception:
-        price = None
-    chg_pct_raw = (q.get("10. change percent") or "0").replace("%", "")
-    try:
-        change_pct = float(Decimal(chg_pct_raw))
-    except Exception:
-        change_pct = None
-    return {"ticker": symbol, "price": price, "change_pct": change_pct}
+# def _fetch_alpha_vantage_quote(symbol: str):
+#     if not ALPHA_VANTAGE_KEY:
+#         return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
+#     base = "https://www.alphavantage.co/query"
+#     qs = urllib.parse.urlencode(
+#         {"function": "GLOBAL_QUOTE", "symbol": symbol, "apikey": ALPHA_VANTAGE_KEY}
+#     )
+#     data = _http_get_json(f"{base}?{qs}")
+#     q = data.get("Global Quote", {})
+#     if not q:
+#         return {"ticker": symbol, "error": "No quote"}
+#     try:
+#         price = float(Decimal(q.get("05. price", "0")))
+#     except Exception:
+#         price = None
+#     chg_pct_raw = (q.get("10. change percent") or "0").replace("%", "")
+#     try:
+#         change_pct = float(Decimal(chg_pct_raw))
+#     except Exception:
+#         change_pct = None
+#     return {"ticker": symbol, "price": price, "change_pct": change_pct}
 
 
 def _fetch_alpha_vantage_news_sentiment(symbol: str):
@@ -210,58 +211,58 @@ def _fetch_news_sentiment_for_tickers(tickers):
     return out
 
 
-def _fetch_quotes_live(tickers):
-    out = []
-    for t in tickers:
-        t = t.strip().upper()
-        if not t:
-            continue
-        out.append(_fetch_alpha_vantage_quote(t))
-    return out
+# def _fetch_quotes_live(tickers):
+#     out = []
+#     for t in tickers:
+#         t = t.strip().upper()
+#         if not t:
+#             continue
+#         out.append(_fetch_alpha_vantage_quote(t))
+#     return out
 
 
-def _upsert_prices(conn, quotes):
-    if not quotes:
-        return
-    with conn.cursor() as c:
-        for q in quotes:
-            if "price" not in q or q.get("price") is None:
-                continue
-            c.execute("SELECT id FROM stocks WHERE ticker=%s", (q["ticker"],))
-            r = c.fetchone()
-            if not r:
-                c.execute("INSERT INTO stocks(ticker) VALUES (%s)", (q["ticker"],))
-                stock_id = c.lastrowid
-            else:
-                stock_id = r["id"]
-            c.execute("""
-                INSERT INTO prices(stock_id, price, change_pct)
-                VALUES (%s,%s,%s)
-                ON DUPLICATE KEY UPDATE price=VALUES(price), change_pct=VALUES(change_pct)
-            """, (stock_id, q["price"], q.get("change_pct")))
-    conn.commit()
+# def _upsert_prices(conn, quotes):
+#     if not quotes:
+#         return
+#     with conn.cursor() as c:
+#         for q in quotes:
+#             if "price" not in q or q.get("price") is None:
+#                 continue
+#             c.execute("SELECT id FROM stocks WHERE ticker=%s", (q["ticker"],))
+#             r = c.fetchone()
+#             if not r:
+#                 c.execute("INSERT INTO stocks(ticker) VALUES (%s)", (q["ticker"],))
+#                 stock_id = c.lastrowid
+#             else:
+#                 stock_id = r["id"]
+#             c.execute("""
+#                 INSERT INTO prices(stock_id, price, change_pct)
+#                 VALUES (%s,%s,%s)
+#                 ON DUPLICATE KEY UPDATE price=VALUES(price), change_pct=VALUES(change_pct)
+#             """, (stock_id, q["price"], q.get("change_pct")))
+#     conn.commit()
 
-def _get_cached_quotes(conn, tickers):
-    if not tickers:
-        return []
-    fmt = ",".join(["%s"] * len(tickers))
-    with conn.cursor() as c:
-        c.execute(f"""
-            SELECT s.ticker, p.price, p.change_pct, p.updated_at
-            FROM stocks s
-            JOIN prices p ON p.stock_id = s.id
-            WHERE s.ticker IN ({fmt})
-        """, tuple(t.upper() for t in tickers))
-        rows = c.fetchall()
-    return [
-        {
-            "ticker": r["ticker"],
-            "price": float(r["price"]) if r["price"] is not None else None,
-            "change_pct": float(r["change_pct"]) if r["change_pct"] is not None else None,
-            "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else None
-        }
-        for r in rows
-    ]
+# def _get_cached_quotes(conn, tickers):
+#     if not tickers:
+#         return []
+#     fmt = ",".join(["%s"] * len(tickers))
+#     with conn.cursor() as c:
+#         c.execute(f"""
+#             SELECT s.ticker, p.price, p.change_pct, p.updated_at
+#             FROM stocks s
+#             JOIN prices p ON p.stock_id = s.id
+#             WHERE s.ticker IN ({fmt})
+#         """, tuple(t.upper() for t in tickers))
+#         rows = c.fetchall()
+#     return [
+#         {
+#             "ticker": r["ticker"],
+#             "price": float(r["price"]) if r["price"] is not None else None,
+#             "change_pct": float(r["change_pct"]) if r["change_pct"] is not None else None,
+#             "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else None
+#         }
+#         for r in rows
+#     ]
 
 
 def lambda_handler(event, context):
@@ -316,7 +317,6 @@ def lambda_handler(event, context):
                     s = sentiments_map.get(ticker, {}) or {}
                     quotes.append({
                         "ticker": ticker,
-                        # keep these fields for frontend compatibility, but they’re always None
                         "price": None,
                         "change_pct": None,
                         "sentiment_score": s.get("sentiment_score"),
