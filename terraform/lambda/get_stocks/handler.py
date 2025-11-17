@@ -6,6 +6,10 @@ from decimal import Decimal
 from datetime import datetime, date
 import boto3
 import traceback  # <--- added for debugging unexpected errors
+try:
+    import pymysql
+except ImportError:
+    pymysql = None
 
 
 comprehend = boto3.client('comprehend')
@@ -40,15 +44,28 @@ def _resp(status, body):
 
 
 def get_db_connection():
+    if pymysql is None:
+        raise RuntimeError("pymysql not installed in lambda package")
+
+    missing = [
+        name for name, val in [
+            ("DB_HOST", DB_HOST),
+            ("DB_USER", DB_USER),
+            ("DB_PASS", DB_PASS),
+            ("DB_NAME", DB_NAME),
+        ] if not val
+    ]
+    if missing:
+        raise RuntimeError(f"Missing DB env vars: {', '.join(missing)}")
+
     return pymysql.connect(
         host=DB_HOST,
         user=DB_USER,
         password=DB_PASS,
         database=DB_NAME,
         connect_timeout=5,
-        cursorclass=pymysql.cursors.DictCursor        
+        cursorclass=pymysql.cursors.DictCursor,
     )
-    
 
 def list_stocks(conn):
     with conn.cursor() as cursor:
