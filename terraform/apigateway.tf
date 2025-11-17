@@ -162,7 +162,7 @@ resource "aws_lambda_function" "get_stocks_lambda" {
   role          = aws_iam_role.lambda_role.arn
   handler       = "handler.lambda_handler"
   runtime       = "python3.12"
-
+  timeout = 15
   filename         = data.archive_file.get_stocks_zip.output_path
   source_code_hash = data.archive_file.get_stocks_zip.output_base64sha256
 
@@ -187,7 +187,7 @@ resource "aws_lambda_function" "init_db_lambda" {
   role          = aws_iam_role.lambda_role.arn
   handler       = "handler.lambda_handler"
   runtime       = "python3.12"
-
+  timeout = 60 
   filename         = data.archive_file.init_rds_zip.output_path
   source_code_hash = data.archive_file.init_rds_zip.output_base64sha256
 
@@ -319,7 +319,7 @@ resource "aws_api_gateway_integration_response" "stocks_options" {
   
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
   

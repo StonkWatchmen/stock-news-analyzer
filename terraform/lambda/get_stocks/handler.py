@@ -1,6 +1,6 @@
 import os
 import json
-import pymysql
+# import pymysql
 import urllib.request, urllib.parse
 from decimal import Decimal
 from datetime import datetime, date
