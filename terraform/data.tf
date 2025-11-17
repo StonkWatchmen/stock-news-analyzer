@@ -66,3 +66,10 @@ data "archive_file" "add_user_zip" {
   source_dir  = "${path.module}/build/add_user"
   output_path = "${path.module}/add_user.zip"
 }
+
+data "archive_file" "get_users_zip" {
+  depends_on  = [null_resource.package_lambda_add_user]
+  type        = "zip"
+  source_dir  = "${path.module}/build/get_users"
+  output_path = "${path.module}/get_users.zip"
+}

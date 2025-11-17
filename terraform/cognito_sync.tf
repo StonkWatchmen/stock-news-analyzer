@@ -45,3 +45,45 @@ resource "aws_lambda_permission" "allow_cognito" {
   principal     = "cognito-idp.amazonaws.com"
   source_arn    = aws_cognito_user_pool.user_pool.arn
 }
+
+# testing
+
+resource "aws_lambda_function" "get_users" {
+  function_name = "get-users"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.12"
+
+  filename         = data.archive_file.get_users_zip.output_path
+  source_code_hash = data.archive_file.get_users_zip.output_base64sha256
+
+  environment {
+    variables = {
+      DB_HOST = aws_db_instance.stock_news_analyzer_db.address
+      DB_USER = var.db_username
+      DB_PASS = var.db_password
+      DB_NAME = "stocknewsanalyzerdb"
+    }
+  }
+
+  vpc_config {
+    subnet_ids         = [aws_subnet.private_subnet.id]
+    security_group_ids = [aws_security_group.lambda_sg.id]
+  }
+}
+
+resource "null_resource" "package_lambda_get_users" {
+  provisioner "local-exec" {
+    command = <<EOT
+      rm -rf ${path.module}/build/get_users
+      mkdir -p ${path.module}/build/get_users/sql
+      cp -r ${path.module}/lambda/get_users/sql/* ${path.module}/build/get_users/sql/
+      cp ${path.module}/lambda/get_users/handler.py ${path.module}/build/get_users/
+      pip install -r ${path.module}/lambda/get_users/requirements.txt -t ${path.module}/build/get_users/
+    EOT
+  }
+
+  triggers = {
+    always_run = timestamp()
+  }
+}
