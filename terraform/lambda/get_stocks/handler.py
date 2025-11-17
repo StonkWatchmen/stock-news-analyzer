@@ -157,64 +157,65 @@ def _http_get_json(url):
 
 
 def _fetch_alpha_vantage_news_sentiment(symbol: str):
+    """Fetch sentiment data for a ticker from AlphaVantage's NEWS_SENTIMENT API"""
     if not ALPHA_VANTAGE_KEY:
         return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
 
     base = "https://www.alphavantage.co/query"
-    qs = urllib.parse.urlencode(
-        {
-            "function": "NEWS_SENTIMENT",
-            "tickers": symbol,
-            "apikey": ALPHA_VANTAGE_KEY,
-        }
-    )
+    qs = urllib.parse.urlencode({
+        "function": "NEWS_SENTIMENT",
+        "tickers": symbol,
+        "apikey": ALPHA_VANTAGE_KEY,
+    })
+    url = f"{base}?{qs}"
+
     try:
-        data = _http_get_json(f"{base}?{qs}")
+        data = _http_get_json(url)
     except Exception as e:
         return {"ticker": symbol, "error": f"HTTP error: {e}"}
 
+    # AlphaVantage returns top-level fields like "feed" and sentiment definitions
     feed = data.get("feed", [])
     if not feed:
-        return {"ticker": symbol, "sentiment_score": None, "sentiment_label": None}
+        return {
+            "ticker": symbol,
+            "sentiment_score": None,
+            "sentiment_label": None,
+            "error": "No sentiment data in feed"
+        }
 
-    scores = []
+    # Some responses include overall_sentiment_score/label directly
+    overall_score = data.get("overall_sentiment_score")
+    overall_label = data.get("overall_sentiment_label")
 
-    for article in feed:
-        for ts in article.get("ticker_sentiment", []):
-            if ts.get("ticker") == symbol:
-                try:
-                    scores.append(float(ts.get("ticker_sentiment_score", 0.0)))
-                except Exception:
-                    continue
-
-    if not scores:
+    # Fallback: compute from ticker_sentiment if present
+    if overall_score is None:
+        scores = []
         for article in feed:
-            try:
-                s = float(article.get("overall_sentiment_score", 0.0))
-                scores.append(s)
-            except Exception:
-                continue
-
-    if not scores:
-        return {"ticker": symbol, "sentiment_score": None, "sentiment_label": None}
-
-    avg = sum(scores) / len(scores)
-
-    if avg <= -0.35:
-        label = "Bearish"
-    elif avg < -0.15:
-        label = "Somewhat-Bearish"
-    elif avg < 0.15:
-        label = "Neutral"
-    elif avg < 0.35:
-        label = "Somewhat-Bullish"
-    else:
-        label = "Bullish"
+            for ts in article.get("ticker_sentiment", []):
+                if ts.get("ticker") == symbol:
+                    try:
+                        scores.append(float(ts.get("ticker_sentiment_score", 0)))
+                    except ValueError:
+                        continue
+        if scores:
+            overall_score = sum(scores) / len(scores)
+            if overall_score <= -0.35:
+                overall_label = "Bearish"
+            elif overall_score < -0.15:
+                overall_label = "Somewhat-Bearish"
+            elif overall_score < 0.15:
+                overall_label = "Neutral"
+            elif overall_score < 0.35:
+                overall_label = "Somewhat-Bullish"
+            else:
+                overall_label = "Bullish"
 
     return {
         "ticker": symbol,
-        "sentiment_score": avg,
-        "sentiment_label": label,
+        "sentiment_score": overall_score,
+        "sentiment_label": overall_label,
+        "error": None
     }
 
 
