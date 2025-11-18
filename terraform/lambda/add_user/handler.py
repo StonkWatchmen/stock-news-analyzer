@@ -21,6 +21,7 @@ def lambda_handler(event, context):
     email = event['request']['userAttributes'].get('email')
 
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO users (id, email) VALUES (%s, %s)", (user, email))
+        # ensure watchlist JSON is initialized as empty array
+        cur.execute("INSERT INTO users (id, email, watchlist) VALUES (%s, %s, %s)", (user, email, '[]'))
         conn.commit()
     return event

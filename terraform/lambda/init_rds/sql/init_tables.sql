@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS stocks;
 CREATE TABLE users (
     id VARCHAR(36) PRIMARY KEY NOT NULL, 
     email VARCHAR(64) NOT NULL,
-    password VARCHAR(64) NOT NULL,
+    password VARCHAR(64) DEFAULT NULL,
     watchlist JSON DEFAULT '[]'
 );
 
