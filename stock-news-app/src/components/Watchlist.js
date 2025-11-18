@@ -1,31 +1,108 @@
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useState} from "react";
 import {getWatchlist, saveWatchlist } from "../utils/storage";
 import "./Watchlist.css"
 
 const TICKER_REGEX = /^[A-Z.-]{1,10}$/;    // Allows ticker patterns like BRK.B, RDS.A, etc.
+// const API_BASE = process.env.REACT_APP_API_BASE;
+const API_BASE = process.env.REACT_APP_API_BASE_URL;
+
+const USER_ID = 1; // until Cognito is hooked up
+
+// Keep tickers consistent: trim whitespace and uppercase
+function normalizeTicker(t) {
+    return t.trim().toUpperCase();
+}
 
 export default function Watchlist() {
     // Track ticker list, input value, and user error message. 
     const [items, setItems] = useState([]);
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
+    const [quotes, setQuotes] = useState([]);
+    const count = items.length;
+    const isDisabled = !input.trim();
 
-    // On load -> fetch saved watchlist from localStorage
+    // load from backend on mount
     useEffect(() => {
-        setItems(getWatchlist());
+        const fetchWatchlist = async () => {
+            if (!API_BASE) {
+                const local = getWatchlist();
+                setItems(local);
+                await fetchQuotesFor(local);
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/watchlist?user_id=${encodeURIComponent(USER_ID)}`);
+                if (!res.ok) {
+                    throw new Error("bad status");
+                }
+                const data = await res.json();
+                const tickers = data.tickers || [];
+                setItems(tickers);
+                saveWatchlist(tickers);
+                await fetchQuotesFor(tickers);
+            } catch (err) {
+                console.warn("Backend watchlist fetch failed, falling back to local:", err);
+                const local = getWatchlist();
+                setItems(local);
+                await fetchQuotesFor(local);
+            }
+        };
+        fetchWatchlist();    
     }, []);
 
-    const count = items.length;
-
-    // Disable "Add" button if input is empty or whitespace
-    const isDisabled = useMemo(() => !input.trim(), [input]);
-
-    // Keep tickers consistent: trim whitespace and uppercase
-    function normalizeTicker(ticker) {
-        return ticker.trim().toUpperCase();
+    async function syncAdd(ticker) {
+        if (!API_BASE) {
+            return;
+        }
+        await fetch(`${API_BASE}/watchlist`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: USER_ID, ticker }),
+        }); 
     }
-    
-    function handleAdd(e) {
+
+    async function syncRemove(ticker) {
+        if (!API_BASE) {
+            return;
+        }
+        await fetch(`${API_BASE}/watchlist`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: USER_ID, ticker }),
+        });
+    }     
+
+
+    // Fetch quotes for a list of tickers and update state
+    async function fetchQuotesFor(list) {
+        if(!list.length){
+            setQuotes([]);
+            return;
+        }
+        if(!API_BASE){
+            console.error("Missing REACT_APP_API_BASE. Prices cannnot be loaded");
+            return;
+        }
+        const qs = encodeURIComponent(list.join(","));
+        try {
+            const res = await fetch(`${API_BASE}/quotes?tickers=${qs}`);
+            if (!res.ok) throw new Error(`quotes ${res.status}`);
+            const data = await res.json();
+            setQuotes(data.quotes || []);
+        } catch (e) {
+            console.warn("Fetching quotes failed:", e);
+            setQuotes([]);
+        }
+    }
+
+
+
+
+
+
+           
+    async function handleAdd(e) {
         e.preventDefault();
 
         // Validation chain -> normalize, check format, check duplicates, check limit
@@ -55,13 +132,20 @@ export default function Watchlist() {
         // Reset form + clear errors
         setInput("");
         setError("");
+
+        // syncAdd(symbol).catch((err) => console.error(err));
+        try { await syncAdd(symbol); } catch (err) { console.error(err); }
+        await fetchQuotesFor(next);
     }
 
     // Remove single ticker
-    function handleRemove(symbol) {
+    async function handleRemove(symbol) {
         const next = items.filter((t) => t !== symbol);
         setItems(next);
         saveWatchlist(next);
+        // syncRemove(symbol).catch((err) => console.error(err));
+        try { await syncRemove(symbol); } catch (err) { console.error(err); }
+        await fetchQuotesFor(next);
     }
 
     // Clear all tickers (with confirmation)
@@ -69,8 +153,12 @@ export default function Watchlist() {
         if (!window.confirm("Clear all tickers from your watchlist?")) {
             return;
         }
+
+        // best effort clear on backend
+        items.forEach((t) => syncRemove(t).catch(() => {}));
         setItems([]);
         saveWatchlist([]);
+        setQuotes([]);
     }
 
     return (
@@ -103,9 +191,39 @@ export default function Watchlist() {
             </div>
 
             <ul className="watchlist-items">
-                {items.map((t) => (
+            {items.map((t) => {
+                const q = quotes.find((x) => x.ticker === t) || {};
+
+                const score =
+                    typeof q.sentiment_score === "number" ? q.sentiment_score : null;
+                const label = q.sentiment_label || null;      // "Bullish", "Bearish", etc.
+                const errorMsg = q.error;
+
+                const scoreDisplay = score !== null ? score.toFixed(3) : "—";
+
+                const sentimentLabel = label || (errorMsg ? "Error" : "—");
+
+                const sentimentClass =
+                    score > 0 ? "up" :
+                    score < 0 ? "down" :
+                    "";
+
+                return (
                     <li key={t} className="watchlist-item">
                         <span className="ticker">{t}</span>
+
+                        <div className="watchlist-values">
+                            {/* Sentiment numeric score */}
+                            <span className={`sentiment-score ${sentimentClass}`}>
+                                {scoreDisplay}
+                            </span>
+
+                            {/* Sentiment label */}
+                            <span className={`sentiment ${sentimentClass}`}>
+                                {sentimentLabel}
+                            </span>
+                        </div>
+
                         <button
                             className="remove-btn"
                             onClick={() => handleRemove(t)}
@@ -114,7 +232,9 @@ export default function Watchlist() {
                             x
                         </button>
                     </li>
-                ))}
+                );
+            })}
+
             </ul> 
         </div>
     );

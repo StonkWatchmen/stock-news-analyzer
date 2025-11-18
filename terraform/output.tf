@@ -13,3 +13,11 @@ output "cognito_client_id" {
 output "cognito_domain" {
   value = aws_cognito_user_pool_domain.auth_domain.domain
 }
+
+
+
+
+output "api_base_url" {
+  description = "API base URL (stage)"
+  value       = "https://${aws_api_gateway_rest_api.stock-news-analyzer-api.id}.execute-api.${var.aws_region}.amazonaws.com/${var.api_stage}"
+}

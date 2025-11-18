@@ -67,3 +67,50 @@ resource "aws_db_subnet_group" "stock_news_analyzer_db_subnet_group" {
     Name = "Stock News Analyzer DB Subnet Group"
   }
 }
+
+
+
+
+////
+# Elastic IP for NAT Gateway
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"
+
+  depends_on = [
+    aws_internet_gateway.stock_news_analyzer_igw
+  ]
+
+  tags = {
+    Name = "stock-news-analyzer-nat-eip"
+  }
+}
+
+
+
+resource "aws_nat_gateway" "nat_gw" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.public_subnet.id
+
+  tags = {
+    Name = "stock-news-analyzer-nat-gw"
+  }
+}
+
+# Private Route Table (for private subnet -> NAT gateway)
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.stock_news_analyzer_vpc.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat_gw.id
+  }
+
+  tags = {
+    Name = "Stock News Analyzer Private Route Table"
+  }
+}
+# Associate Private Subnet with Private Route Table
+resource "aws_route_table_association" "private_rta" {
+  subnet_id      = aws_subnet.private_subnet.id
+  route_table_id = aws_route_table.private_rt.id
+}

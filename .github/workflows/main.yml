@@ -39,6 +39,7 @@ jobs:
       TF_VAR_db_username: ${{ secrets.DB_USERNAME}}
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_alpha_vantage_key: ${{ secrets.ALPHAVANTAGE_API_KEY }}
       ENVIRONMENT_NAME: ${{ github.event.inputs.target }}
 
     steps:
@@ -90,10 +91,18 @@ jobs:
 
       - name: Get Terraform outputs
         run: |
+          echo "REACT_APP_API_BASE_URL=$(terraform output -raw api_base_url)" >> $GITHUB_ENV
           echo "REACT_APP_COGNITO_USER_POOL_ID=$(terraform output -raw cognito_user_pool_id)" >> $GITHUB_ENV
           echo "REACT_APP_COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
           echo "REACT_APP_COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
         working-directory: ./terraform
+
+      # Step 9: Init RDS Database
+      - name: Initialize Database
+        run: |
+          aws lambda invoke \
+          --function-name init-db-lambda \
+          response.json
 
       # Step 9: Install npm
       - name: Install npm
@@ -101,8 +110,8 @@ jobs:
         working-directory: ./stock-news-app
 
       # Step 10: Install dependencies
-      - name: Install Cognito Identity SDK and React Router Dom
-        run: npm install amazon-cognito-identity-js react-router-dom@6
+      - name: Install Cognito Identity SDK, React Router Dom, and Recharts
+        run: npm install amazon-cognito-identity-js react-router-dom@6 recharts
         working-directory: ./stock-news-app
 
       # Step 11: Build React app
@@ -129,6 +138,7 @@ jobs:
       TF_VAR_db_username: ${{ secrets.DB_USERNAME}}
       TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
       TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_alpha_vantage_key: ${{ secrets.ALPHAVANTAGE_API_KEY }}
       ENVIRONMENT_NAME: ${{ github.event.inputs.target }}
 
     steps:
