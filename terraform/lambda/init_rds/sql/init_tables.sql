@@ -1,22 +1,26 @@
 DROP TABLE IF EXISTS watchlist;
+DROP TABLE IF EXISTS prices;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS stocks;
 
 CREATE TABLE users (
     id VARCHAR(36) PRIMARY KEY NOT NULL, 
     email VARCHAR(64) NOT NULL,
-    password VARCHAR(64) NOT NULL
+    password VARCHAR(64) NOT NULL,
+    watchlist JSON DEFAULT '[]'
 );
 
 CREATE TABLE stocks (
     id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
-    ticker VARCHAR(10) NOT NULL
+    ticker VARCHAR(10) NOT NULL UNIQUE
 );
 
-CREATE TABLE watchlist (
+CREATE TABLE prices (
     id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
-    user_id INTEGER NOT NULL,
-    stock_id INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (stock_id) REFERENCES stocks(id)
+    stock_id INT NOT NULL,
+    price DECIMAL(10, 2),
+    change_pct DECIMAL(5, 2),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (stock_id) REFERENCES stocks(id),
+    UNIQUE KEY unique_stock_price (stock_id)
 );
