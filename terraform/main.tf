@@ -213,7 +213,7 @@ resource "aws_iam_role" "backfill_role" {
 
 # Attach Comprehend policy to backfill role
 resource "aws_iam_role_policy" "backfill_comprehend" {
-  name = "backfill-comprehend-and-s3-access"
+  name = "backfill-comprehend-access"
   role = aws_iam_role.backfill_role.id
 
   policy = jsonencode({
@@ -228,17 +228,6 @@ resource "aws_iam_role_policy" "backfill_comprehend" {
           "comprehend:BatchDetectKeyPhrases"
         ]
         Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.backfill_scripts.arn,                    # bucket itself for ListBucket
-          "${aws_s3_bucket.backfill_scripts.arn}/*"             # all objects in bucket for GetObject
-        ]
       }
     ]
   })
@@ -250,25 +239,25 @@ resource "aws_iam_instance_profile" "backfill_profile" {
   role = aws_iam_role.backfill_role.name
 }
 
-# Prepare user data script (small, downloads from S3)
+# Prepare user data script
 data "template_file" "backfill_user_data" {
   template = file("${path.module}/scripts/user_data.sh")
 
   vars = {
-    S3_BUCKET         = aws_s3_bucket.backfill_scripts.id
-    DB_HOST           = aws_db_instance.stock_news_analyzer_db.address
-    DB_USER           = var.db_username
-    DB_PASS           = var.db_password
-    DB_NAME           = "stocknewsanalyzerdb"
-    ALPHA_VANTAGE_KEY = var.alpha_vantage_key
-    AWS_REGION        = var.aws_region
+    BACKFILL_SCRIPT_CONTENT = file("${path.module}/scripts/backfill_data.py")
+    DB_HOST                 = aws_db_instance.stock_news_analyzer_db.address
+    DB_USER                 = var.db_username
+    DB_PASS                 = var.db_password
+    DB_NAME                 = "stocknewsanalyzerdb"
+    ALPHA_VANTAGE_KEY       = var.alpha_vantage_key
+    AWS_REGION              = var.aws_region
   }
 }
 
 resource "aws_instance" "backfill_instance" {
   ami                    = data.aws_ami.amazonlinux.id
-  instance_type          = "t3.micro"
-  subnet_id              = aws_subnet.public_subnet.id
+  instance_type          = "t3.micro"  # Enough for the task
+  subnet_id              = aws_subnet.public_subnet.id  # Needs internet access
   vpc_security_group_ids = [aws_security_group.backfill_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.backfill_profile.name
 
@@ -278,30 +267,6 @@ resource "aws_instance" "backfill_instance" {
     Name = "stock-news-analyzer-backfill"
   }
 
+  # Terminate instance after it completes (optional)
   instance_initiated_shutdown_behavior = "terminate"
-}
-
-# Create S3 bucket to host scripts
-resource "aws_s3_bucket" "backfill_scripts" {
-  bucket        = "stock-news-backfill-scripts-${var.environment}"
-  force_destroy = true
-
-  tags = {
-    Name        = "BackfillScripts"
-    Environment = "Prod"
-  }
-}
-
-# Upload Python script
-resource "aws_s3_object" "backfill_script" {
-  bucket = aws_s3_bucket.backfill_scripts.id
-  key = "backfill_data.py"
-  source = "${path.module}/scripts/backfill_data.py"
-}
-
-# Upload requirements.txt
-resource "aws_s3_object" "requirements" {
-  bucket = aws_s3_bucket.backfill_scripts.id
-  key = "requirements.txt"
-  source = "${path.module}/scripts/requirements.txt"
 }

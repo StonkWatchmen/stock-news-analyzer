@@ -1,13 +1,32 @@
 #!/bin/bash
-yum update -y
-yum install -y python3 python3-pip git awscli
+set -e
 
+# Log everything
+exec > >(tee /var/log/user-data.log)
+exec 2>&1
+
+echo "Starting backfill EC2 instance setup..."
+
+# Update system
+yum update -y
+
+# Install Python 3 and pip
+yum install -y python3 python3-pip git
+
+# Create working directory
 mkdir -p /home/ec2-user/backfill
 cd /home/ec2-user/backfill
 
-# Download scripts from S3
-aws s3 cp s3://${S3_BUCKET}/backfill_data.py ./backfill_data.py
-aws s3 cp s3://${S3_BUCKET}/requirements.txt ./requirements.txt
+# Download the backfill script (you'll need to host this somewhere or inline it)
+cat > backfill_data.py << 'BACKFILL_SCRIPT'
+${BACKFILL_SCRIPT_CONTENT}
+BACKFILL_SCRIPT
+
+cat > requirements.txt << 'REQUIREMENTS'
+pymysql
+requests
+boto3
+REQUIREMENTS
 
 # Install Python dependencies
 pip3 install -r requirements.txt
@@ -20,8 +39,13 @@ export DB_NAME="${DB_NAME}"
 export ALPHA_VANTAGE_KEY="${ALPHA_VANTAGE_KEY}"
 export AWS_REGION="${AWS_REGION}"
 
-# Run backfill
+# Run the backfill script
+echo "Running backfill script..."
 python3 backfill_data.py
 
-# Terminate instance after completion
+# Send completion notification (optional)
+echo "Backfill completed at $(date)" >> /tmp/backfill_complete.txt
+
+# Shutdown instance after completion (optional - saves costs)
+echo "Shutting down instance in 5 minutes..."
 shutdown -h +5
