@@ -536,5 +536,8 @@ resource "aws_api_gateway_integration_response" "stock_history_options" {
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
   
-  depends_on = [aws_api_gateway_integration.stock_history_options]
+  depends_on = [
+    aws_api_gateway_integration.stock_history_options,
+    aws_api_gateway_method_response.stock_history_options_200
+  ]
 }
