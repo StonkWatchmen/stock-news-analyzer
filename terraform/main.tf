@@ -207,3 +207,128 @@ resource "null_resource" "package_lambda_init" {
     always_run = timestamp()
   }
 }
+
+# ========================================
+# Backfill EC2 Instance
+# ========================================
+
+# Security group for backfill EC2
+resource "aws_security_group" "backfill_sg" {
+  name        = "stock-news-analyzer-backfill-sg"
+  description = "Security group for backfill EC2 instance"
+  vpc_id      = aws_vpc.main.id
+
+  # Allow outbound to internet (for Alpha Vantage API)
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow outbound to RDS
+  egress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.rds_sg.id]
+  }
+
+  tags = {
+    Name = "stock-news-analyzer-backfill-sg"
+  }
+}
+
+# Update RDS security group to allow backfill EC2
+resource "aws_security_group_rule" "rds_from_backfill" {
+  type                     = "ingress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.backfill_sg.id
+  security_group_id        = aws_security_group.rds_sg.id
+}
+
+# IAM role for backfill EC2
+resource "aws_iam_role" "backfill_role" {
+  name = "stock-news-analyzer-backfill-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+# Attach Comprehend policy to backfill role
+resource "aws_iam_role_policy" "backfill_comprehend" {
+  name = "backfill-comprehend-access"
+  role = aws_iam_role.backfill_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "comprehend:DetectSentiment",
+          "comprehend:DetectKeyPhrases"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# IAM instance profile
+resource "aws_iam_instance_profile" "backfill_profile" {
+  name = "stock-news-analyzer-backfill-profile"
+  role = aws_iam_role.backfill_role.name
+}
+
+# Prepare user data script
+data "template_file" "backfill_user_data" {
+  template = file("${path.module}/scripts/user_data.sh")
+
+  vars = {
+    BACKFILL_SCRIPT_CONTENT = file("${path.module}/scripts/backfill_data.py")
+    DB_HOST                 = aws_db_instance.stock_news_analyzer_db.address
+    DB_USER                 = var.db_username
+    DB_PASS                 = var.db_password
+    DB_NAME                 = "stocknewsanalyzerdb"
+    ALPHA_VANTAGE_KEY       = var.alpha_vantage_key
+    AWS_REGION              = var.aws_region
+  }
+}
+
+# Backfill EC2 Instance (manually triggered)
+resource "aws_instance" "backfill_instance" {
+  count = var.run_backfill ? 1 : 0  # Only create if variable is true
+
+  ami                    = data.aws_ami.amazonlinux.id
+  instance_type          = "t3.small"  # Enough for the task
+  subnet_id              = aws_subnet.public_subnet.id  # Needs internet access
+  vpc_security_group_ids = [aws_security_group.backfill_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.backfill_profile.name
+
+  user_data = data.template_file.backfill_user_data.rendered
+
+  tags = {
+    Name = "stock-news-analyzer-backfill"
+  }
+
+  # Terminate instance after it completes (optional)
+  instance_initiated_shutdown_behavior = "terminate"
+}
+
+# Variable to control backfill instance creation
+variable "run_backfill" {
+  description = "Set to true to create and run backfill EC2 instance"
+  type        = bool
+  default     = false
+}
