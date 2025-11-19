@@ -71,60 +71,6 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
   db_subnet_group_name   = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.name # Use the created subnet group
 }
 
-resource "aws_instance" "db_init" {
-  ami                         = data.aws_ami.amazonlinux.id
-  instance_type               = "t2.micro"
-  subnet_id                   = aws_subnet.public_subnet.id
-  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
-  associate_public_ip_address = true
-  depends_on                  = [aws_db_instance.stock_news_analyzer_db]
-
-  user_data = <<-EOF
-    #!/bin/bash
-    yum install -y mysql
-
-    # Retry loop until DB is ready
-    until mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-                -u ${var.db_username} \
-                -p${var.db_password} \
-                -e "SELECT 1" >/dev/null 2>&1; do
-        sleep 5
-    done
-
-    mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-          -u ${var.db_username} \
-          -p${var.db_password} \
-          stocknewsanalyzerdb
-
-    shutdown -h now
-  EOF
-
-  tags = {
-    Name = "db-init"
-  }
-}
-
-
-resource "aws_iam_role" "ec2_role" {
-  name = "stock-news-analyzer-ec2-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = { Service = "ec2.amazonaws.com" }
-        Action    = "sts:AssumeRole"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_basic_execution" {
-  role       = aws_iam_role.ec2_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-  depends_on = [aws_iam_role.ec2_role]
-}
 
 resource "aws_cognito_user_pool" "user_pool" {
   name = "stock-news-analyzer-user-pool"
@@ -306,10 +252,7 @@ data "template_file" "backfill_user_data" {
   }
 }
 
-# Backfill EC2 Instance (manually triggered)
 resource "aws_instance" "backfill_instance" {
-  count = var.run_backfill ? 1 : 0  # Only create if variable is true
-
   ami                    = data.aws_ami.amazonlinux.id
   instance_type          = "t3.micro"  # Enough for the task
   subnet_id              = aws_subnet.public_subnet.id  # Needs internet access
@@ -324,11 +267,4 @@ resource "aws_instance" "backfill_instance" {
 
   # Terminate instance after it completes (optional)
   instance_initiated_shutdown_behavior = "terminate"
-}
-
-# Variable to control backfill instance creation
-variable "run_backfill" {
-  description = "Set to true to create and run backfill EC2 instance"
-  type        = bool
-  default     = false
 }
