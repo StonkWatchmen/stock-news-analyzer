@@ -86,12 +86,12 @@ export default function Chart() {
               className="select-input"
             >
               <option value="AAPL">Apple (AAPL)</option>
-              <option value="MSFT">Microsoft (MSFT)</option>
-              <option value="GOOGL">Google (GOOGL)</option>
+              <option value="NFLX">Netflix (NFLX)</option>
               <option value="AMZN">Amazon (AMZN)</option>
-              <option value="TSLA">Tesla (TSLA)</option>
-              <option value="META">Meta (META)</option>
               <option value="NVDA">NVIDIA (NVDA)</option>
+              <option value="META">Meta (META)</option>
+              <option value="MSFT">Microsoft (MSFT)</option>
+              <option value="AMD">AMD (AMD)</option>
             </select>
           </div>
 

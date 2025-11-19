@@ -223,7 +223,9 @@ resource "aws_iam_role_policy" "backfill_comprehend" {
         Effect = "Allow"
         Action = [
           "comprehend:DetectSentiment",
-          "comprehend:DetectKeyPhrases"
+          "comprehend:BatchDetectSentiment",
+          "comprehend:DetectKeyPhrases",
+          "comprehend:BatchDetectKeyPhrases"
         ]
         Resource = "*"
       }
