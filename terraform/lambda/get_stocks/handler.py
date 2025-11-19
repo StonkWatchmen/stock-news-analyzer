@@ -358,9 +358,6 @@ def lambda_handler(event, context):
                 if not user_id:
                     return _resp(400, {"error": "user_id is required"})
                 tickers = get_watchlist(conn, user_id)
-<<<<<<< HEAD
-                return _resp(200, {"user_id": user_id, "tickers": tickers})
-=======
                 return _resp(200, {"user_id": int(user_id), "tickers": tickers})
             # GET /stock-history?ticker=AAPL&range=7d
             if path.endswith("/stock-history") and method == "GET":
@@ -385,7 +382,6 @@ def lambda_handler(event, context):
                     "history": history,
                     "count": len(history)
                 })
->>>>>>> 6c792f8253889f72261160d1d54340c9fccc2a83
 
             # GET /quotes?tickers=AAPL,MSFT
             if path.endswith("/quotes") and method == "GET":
