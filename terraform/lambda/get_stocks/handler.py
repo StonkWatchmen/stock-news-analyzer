@@ -163,8 +163,18 @@ def _http_get_json(url):
 #     return {"ticker": symbol, "price": price, "change_pct": change_pct}
 
 
+def _analyze_with_comprehend(text):
+    """Analyze text sentiment using AWS Comprehend"""
+    try:
+        response = comprehend.detect_sentiment(Text=text, LanguageCode='en')
+        sentiment = response['Sentiment']
+        score = response['SentimentScore'][sentiment.title()]
+        return {"sentiment": sentiment, "score": score}
+    except Exception as e:
+        return {"error": str(e)}
+
 def _fetch_alpha_vantage_news_sentiment(symbol: str):
-    """Fetch sentiment data for a ticker from AlphaVantage's NEWS_SENTIMENT API"""
+    """Fetch sentiment data using AlphaVantage + Comprehend analysis"""
     if not ALPHA_VANTAGE_KEY:
         return {"ticker": symbol, "error": "Missing ALPHA_VANTAGE_KEY"}
 
@@ -181,7 +191,6 @@ def _fetch_alpha_vantage_news_sentiment(symbol: str):
     except Exception as e:
         return {"ticker": symbol, "error": f"HTTP error: {e}"}
 
-    # AlphaVantage returns top-level fields like "feed" and sentiment definitions
     feed = data.get("feed", [])
     if not feed:
         return {
@@ -191,33 +200,32 @@ def _fetch_alpha_vantage_news_sentiment(symbol: str):
             "error": "No sentiment data in feed"
         }
 
-    # Some responses include overall_sentiment_score/label directly
+    # Use Comprehend to analyze article summaries
+    comprehend_results = []
+    for article in feed[:5]:  # Analyze top 5 articles
+        summary = article.get("summary", "")
+        if summary and len(summary) > 10:
+            result = _analyze_with_comprehend(summary)
+            if "error" not in result:
+                comprehend_results.append(result)
+
+    # Combine Comprehend results
+    if comprehend_results:
+        avg_score = sum(r["score"] for r in comprehend_results) / len(comprehend_results)
+        sentiments = [r["sentiment"] for r in comprehend_results]
+        most_common = max(set(sentiments), key=sentiments.count)
+        
+        return {
+            "ticker": symbol,
+            "sentiment_score": avg_score,
+            "sentiment_label": most_common.title(),
+            "error": None
+        }
+
+    # Fallback to AlphaVantage sentiment if Comprehend fails
     overall_score = data.get("overall_sentiment_score")
     overall_label = data.get("overall_sentiment_label")
-
-    # Fallback: compute from ticker_sentiment if present
-    if overall_score is None:
-        scores = []
-        for article in feed:
-            for ts in article.get("ticker_sentiment", []):
-                if ts.get("ticker") == symbol:
-                    try:
-                        scores.append(float(ts.get("ticker_sentiment_score", 0)))
-                    except ValueError:
-                        continue
-        if scores:
-            overall_score = sum(scores) / len(scores)
-            if overall_score <= -0.35:
-                overall_label = "Bearish"
-            elif overall_score < -0.15:
-                overall_label = "Somewhat-Bearish"
-            elif overall_score < 0.15:
-                overall_label = "Neutral"
-            elif overall_score < 0.35:
-                overall_label = "Somewhat-Bullish"
-            else:
-                overall_label = "Bullish"
-
+    
     return {
         "ticker": symbol,
         "sentiment_score": overall_score,
