@@ -20,7 +20,7 @@ export default function SignOut() {
     }
 
     return (
-        <div className="auth-container" style={{ maxWidth: "200px", margin: "100px auto", textAlign: "center" }}>
+        <div style={{ maxWidth: "200px", margin: "100px auto", textAlign: "center" }}>
             <button
                 className="auth-btn"
                 onClick={handleSignOut}
