@@ -46,8 +46,9 @@ resource "aws_api_gateway_method" "get_stocks" {
   rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
   resource_id   = aws_api_gateway_resource.stocks.id
   http_method   = "GET"
-  authorization = "NONE"
-  # Shows ALL available stocks - no auth needed
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito_authorizer.id
+  depends_on    = [aws_api_gateway_authorizer.cognito_authorizer]
 }
 
 resource "aws_api_gateway_method" "stocks_options" {
@@ -405,31 +406,27 @@ resource "aws_api_gateway_deployment" "api_deployment" {
   rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
 
   triggers = {
+    # Redeploy when any of these resources change
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.stocks.id,
       aws_api_gateway_resource.watchlist.id,
       aws_api_gateway_resource.quotes.id,
-      aws_api_gateway_resource.stock_history.id,  # ADD THIS
       aws_api_gateway_method.get_stocks.id,
       aws_api_gateway_method.get_watchlist.id,
       aws_api_gateway_method.post_watchlist.id,
       aws_api_gateway_method.delete_watchlist.id,
       aws_api_gateway_method.get_quotes.id,
-      aws_api_gateway_method.get_stock_history.id,  # ADD THIS
       aws_api_gateway_method.stocks_options.id,
       aws_api_gateway_method.watchlist_options.id,
       aws_api_gateway_method.quotes_options.id,
-      aws_api_gateway_method.stock_history_options.id,  # ADD THIS
       aws_api_gateway_integration.get_stocks_lambda_integration.id,
       aws_api_gateway_integration.get_watchlist_lambda_integration.id,
       aws_api_gateway_integration.post_watchlist_lambda_integration.id,
       aws_api_gateway_integration.delete_watchlist_lambda_integration.id,
       aws_api_gateway_integration.get_quotes_lambda_integration.id,
-      aws_api_gateway_integration.get_stock_history_lambda_integration.id,  # ADD THIS
       aws_api_gateway_integration.stocks_options.id,
       aws_api_gateway_integration.watchlist_options.id,
       aws_api_gateway_integration.quotes_options.id,
-      aws_api_gateway_integration.stock_history_options.id,  # ADD THIS
     ]))
   }
 
@@ -443,15 +440,12 @@ resource "aws_api_gateway_deployment" "api_deployment" {
     aws_api_gateway_integration.post_watchlist_lambda_integration,
     aws_api_gateway_integration.delete_watchlist_lambda_integration,
     aws_api_gateway_integration.get_quotes_lambda_integration,
-    aws_api_gateway_integration.get_stock_history_lambda_integration,  # ADD THIS
     aws_api_gateway_integration.stocks_options,
     aws_api_gateway_integration.watchlist_options,
     aws_api_gateway_integration.quotes_options,
-    aws_api_gateway_integration.stock_history_options,  # ADD THIS
     aws_api_gateway_integration_response.stocks_options,
     aws_api_gateway_integration_response.watchlist_options,
     aws_api_gateway_integration_response.quotes_options,
-    aws_api_gateway_integration_response.stock_history_options,  # ADD THIS
   ]
 }
 
@@ -462,82 +456,67 @@ resource "aws_api_gateway_stage" "api_stage" {
 }
 
 # ========================================
-# API Gateway Resource - /stock-history
+# Outputs
 # ========================================
-resource "aws_api_gateway_resource" "stock_history" {
-  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  parent_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.root_resource_id
-  path_part   = "stock-history"
+output "api_endpoint" {
+  description = "API Gateway endpoint URL"
+  value       = aws_api_gateway_stage.api_stage.invoke_url
 }
 
-# GET /stock-history?stock_id=1 or ?ticker=AAPL
-resource "aws_api_gateway_method" "get_stock_history" {
-  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id   = aws_api_gateway_resource.stock_history.id
-  http_method   = "GET"
-  authorization = "NONE"
+output "api_id" {
+  description = "API Gateway REST API ID"
+  value       = aws_api_gateway_rest_api.stock-news-analyzer-api.id
 }
 
-resource "aws_api_gateway_method" "stock_history_options" {
-  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id   = aws_api_gateway_resource.stock_history.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
+# # --- IAM Role for EventBridge Scheduler ---
+# resource "aws_iam_role" "scheduler_role" {
+#   name = "lambda-scheduler-role"
 
-# ========================================
-# Lambda Integration - /stock-history
-# ========================================
-resource "aws_api_gateway_integration" "get_stock_history_lambda_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id             = aws_api_gateway_resource.stock_history.id
-  http_method             = aws_api_gateway_method.get_stock_history.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.get_stocks_lambda.invoke_arn
-}
+#   assume_role_policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [{
+#       Effect = "Allow"
+#       Principal = {
+#         Service = "scheduler.amazonaws.com"
+#       }
+#       Action = "sts:AssumeRole"
+#     }]
+#   })
+# }
 
-resource "aws_api_gateway_integration" "stock_history_options" {
-  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id = aws_api_gateway_resource.stock_history.id
-  http_method = aws_api_gateway_method.stock_history_options.http_method
-  type        = "MOCK"
-  
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
+# # --- IAM Policy allowing Scheduler to invoke Lambda ---
+# resource "aws_iam_role_policy" "scheduler_policy" {
+#   name = "scheduler-invoke-lambda"
+#   role = aws_iam_role.scheduler_role.id
 
-# ========================================
-# CORS Method Responses - /stock-history
-# ========================================
-resource "aws_api_gateway_method_response" "stock_history_options_200" {
-  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id = aws_api_gateway_resource.stock_history.id
-  http_method = aws_api_gateway_method.stock_history_options.http_method
-  status_code = "200"
-  
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
+#   policy = jsonencode({
+#     Version = "2012-10-17"
+#     Statement = [{
+#       Effect = "Allow"
+#       Action = "lambda:InvokeFunction"
+#       Resource = aws_lambda_function.get_stocks_lambda.arn
+#     }]
+#   })
+# }
 
-resource "aws_api_gateway_integration_response" "stock_history_options" {
-  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id = aws_api_gateway_resource.stock_history.id
-  http_method = aws_api_gateway_method.stock_history_options.http_method
-  status_code = "200"
-  
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-  }
-  
-  depends_on = [
-    aws_api_gateway_integration.stock_history_options,
-    aws_api_gateway_method_response.stock_history_options_200
-  ]
-}
+# // creates AWS Eventbridge Scheduler
+# resource "aws_scheduler_schedule" "lambda_schedule" {
+#   name       = "invoke-collections-every-hour"
+#   description = "Triggers Lambda every hour"
+
+#   flexible_time_window {
+#     mode = "OFF"
+#   }
+
+#   schedule_expression = "rate(1 hour)"
+
+#   target {
+#     arn      = aws_lambda_function.get_stocks_lambda.arn
+#     role_arn = aws_iam_role.scheduler_role.arn
+
+#     # Optional payload to Lambda
+#     input = jsonencode({
+#       action = "run_check"
+#     })
+#   }
+# }
