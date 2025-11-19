@@ -1,15 +1,13 @@
 DROP TABLE IF EXISTS article_history;
 DROP TABLE IF EXISTS stock_history;
 DROP TABLE IF EXISTS watchlist;
-DROP TABLE IF EXISTS prices;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS stocks;
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
     email VARCHAR(64) NOT NULL,
-    password VARCHAR(64) DEFAULT NULL,
-    watchlist JSON DEFAULT '[]'
+    password VARCHAR(64) NOT NULL
 );
 
 CREATE TABLE stocks (
@@ -17,7 +15,7 @@ CREATE TABLE stocks (
     ticker VARCHAR(10) NOT NULL UNIQUE
 );
 
-CREATE TABLE prices (
+CREATE TABLE watchlist (
     id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
     user_id INTEGER NOT NULL,
     stock_id INTEGER NOT NULL,
