@@ -10,6 +10,7 @@ try:
     import pymysql
 except ImportError:
     pymysql = None
+from datetime import datetime, timedelta
 
 
 comprehend = boto3.client('comprehend')
@@ -19,6 +20,46 @@ DB_PASS = os.environ['DB_PASS']
 DB_NAME = os.environ['DB_NAME']
 ALPHA_VANTAGE_KEY = os.environ.get('ALPHA_VANTAGE_KEY')  
 
+def get_stock_history(conn, stock_id=None, ticker=None, time_range="24h"):
+    """
+    Get stock history records for a specific time range
+    time_range options: '24h', '7d', '30d', '90d', '1y', 'all'
+    """
+    
+    # Calculate the start time based on range
+    now = datetime.now()
+    time_ranges = {
+        '24h': now - timedelta(hours=24),
+        '7d': now - timedelta(days=7),
+        '30d': now - timedelta(days=30),
+        '90d': now - timedelta(days=90),
+        '1y': now - timedelta(days=365),
+        'all': datetime(2000, 1, 1)  # Very old date for "all time"
+    }
+    
+    start_time = time_ranges.get(time_range, time_ranges['24h'])
+    
+    with conn.cursor() as cursor:
+        if stock_id:
+            cursor.execute("""
+                SELECT sh.id, sh.stock_id, s.ticker, sh.price, sh.avg_sentiment, sh.recorded_at
+                FROM stock_history sh
+                JOIN stocks s ON sh.stock_id = s.id
+                WHERE sh.stock_id = %s AND sh.recorded_at >= %s
+                ORDER BY sh.recorded_at ASC
+            """, (stock_id, start_time))
+        elif ticker:
+            cursor.execute("""
+                SELECT sh.id, sh.stock_id, s.ticker, sh.price, sh.avg_sentiment, sh.recorded_at
+                FROM stock_history sh
+                JOIN stocks s ON sh.stock_id = s.id
+                WHERE s.ticker = %s AND sh.recorded_at >= %s
+                ORDER BY sh.recorded_at ASC
+            """, (ticker.upper(), start_time))
+        else:
+            return []
+        
+        return cursor.fetchall()
 
 # Custom JSON encoder to handle Decimal and datetime objects
 class CustomJSONEncoder(json.JSONEncoder):
@@ -317,7 +358,34 @@ def lambda_handler(event, context):
                 if not user_id:
                     return _resp(400, {"error": "user_id is required"})
                 tickers = get_watchlist(conn, user_id)
+<<<<<<< HEAD
                 return _resp(200, {"user_id": user_id, "tickers": tickers})
+=======
+                return _resp(200, {"user_id": int(user_id), "tickers": tickers})
+            # GET /stock-history?ticker=AAPL&range=7d
+            if path.endswith("/stock-history") and method == "GET":
+                qs = event.get("queryStringParameters") or {}
+                stock_id = qs.get("stock_id")
+                ticker = qs.get("ticker")
+                time_range = qs.get("range", "24h")  # Default to 24 hours
+                
+                if not stock_id and not ticker:
+                    return _resp(400, {"error": "stock_id or ticker is required"})
+                
+                history = get_stock_history(
+                    conn, 
+                    stock_id=int(stock_id) if stock_id else None,
+                    ticker=ticker,
+                    time_range=time_range
+                )
+                
+                return _resp(200, {
+                    "ticker": ticker.upper() if ticker else None,
+                    "time_range": time_range,
+                    "history": history,
+                    "count": len(history)
+                })
+>>>>>>> 6c792f8253889f72261160d1d54340c9fccc2a83
 
             # GET /quotes?tickers=AAPL,MSFT
             if path.endswith("/quotes") and method == "GET":

@@ -66,103 +66,14 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
   username               = var.db_username                                              # Database admin username
   password               = var.db_password                                              # Replace with a secure password
   parameter_group_name   = "default.mysql8.0"                                           # Default parameter group for MySQL 8.0
-  skip_final_snapshot    = true                                                         # Skip final snapshot when destroying the database
+  skip_final_snapshot    = true
+  deletion_protection    = false
+  delete_automated_backups = true
+  backup_retention_period = 0
   vpc_security_group_ids = [aws_security_group.rds_sg.id]                               # Attach the RDS security group
   db_subnet_group_name   = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.name # Use the created subnet group
 }
 
-resource "aws_instance" "db_init" {
-  ami                         = data.aws_ami.amazonlinux.id
-  instance_type               = "t2.micro"
-  subnet_id                   = aws_subnet.public_subnet.id
-  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
-  associate_public_ip_address = true
-  depends_on                  = [aws_db_instance.stock_news_analyzer_db]
-
-  user_data = <<-EOF
-    #!/bin/bash
-    yum update -y
-    yum install -y mysql
-
-    # Wait for DB to be ready
-    until mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-                -u ${var.db_username} \
-                -p${var.db_password} \
-                -e "SELECT 1" >/dev/null 2>&1; do
-        sleep 10
-    done
-
-    # Create tables
-    mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
-          -u ${var.db_username} \
-          -p${var.db_password} \
-          stocknewsanalyzerdb << 'EOSQL'
-DROP TABLE IF EXISTS watchlist;
-DROP TABLE IF EXISTS prices;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS stocks;
-
-CREATE TABLE users (
-    id VARCHAR(36) PRIMARY KEY NOT NULL, 
-    email VARCHAR(64) NOT NULL,
-    password VARCHAR(64) DEFAULT NULL,
-    watchlist JSON DEFAULT '[]'
-);
-
-CREATE TABLE stocks (
-    id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
-    ticker VARCHAR(10) NOT NULL UNIQUE
-);
-
-CREATE TABLE prices (
-    id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
-    stock_id INT NOT NULL,
-    price DECIMAL(10, 2),
-    change_pct DECIMAL(5, 2),
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (stock_id) REFERENCES stocks(id),
-    UNIQUE KEY unique_stock_price (stock_id)
-);
-
-INSERT INTO stocks (ticker) VALUES
-    ('AAPL'),
-    ('NFLX'),
-    ('AMZN'),
-    ('NVDA'),
-    ('META'),
-    ('MSFT'),
-    ('AMD');
-EOSQL
-
-    shutdown -h now
-  EOF
-
-  tags = {
-    Name = "db-init"
-  }
-}
-
-
-resource "aws_iam_role" "ec2_role" {
-  name = "stock-news-analyzer-ec2-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = { Service = "ec2.amazonaws.com" }
-        Action    = "sts:AssumeRole"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_basic_execution" {
-  role       = aws_iam_role.ec2_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-  depends_on = [aws_iam_role.ec2_role]
-}
 
 resource "aws_cognito_user_pool" "user_pool" {
   name = "stock-news-analyzer-user-pool"
@@ -188,7 +99,10 @@ resource "aws_cognito_user_pool" "user_pool" {
     post_confirmation = aws_lambda_function.add_user.arn
   }
 
-  depends_on = [aws_lambda_function.add_user]
+  depends_on = [
+    aws_lambda_function.add_user,
+    aws_lambda_invocation.init_database
+  ]
 }
 resource "aws_cognito_user_pool_client" "web_client" {
   name            = "stock-news-analyzer-client"
@@ -244,4 +158,121 @@ resource "null_resource" "package_lambda_init" {
   triggers = {
     always_run = timestamp()
   }
+}
+
+# ========================================
+# Backfill EC2 Instance
+# ========================================
+
+# Security group for backfill EC2
+resource "aws_security_group" "backfill_sg" {
+  name        = "stock-news-analyzer-backfill-sg"
+  description = "Security group for backfill EC2 instance"
+  vpc_id      = aws_vpc.stock_news_analyzer_vpc.id
+
+  # Allow outbound to internet (for Alpha Vantage API)
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow outbound to RDS
+  egress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.rds_sg.id]
+  }
+
+  tags = {
+    Name = "stock-news-analyzer-backfill-sg"
+  }
+}
+
+# Update RDS security group to allow backfill EC2
+resource "aws_security_group_rule" "rds_from_backfill" {
+  type                     = "ingress"
+  from_port                = 3306
+  to_port                  = 3306
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.backfill_sg.id
+  security_group_id        = aws_security_group.rds_sg.id
+}
+
+# IAM role for backfill EC2
+resource "aws_iam_role" "backfill_role" {
+  name = "stock-news-analyzer-backfill-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+# Attach Comprehend policy to backfill role
+resource "aws_iam_role_policy" "backfill_comprehend" {
+  name = "backfill-comprehend-access"
+  role = aws_iam_role.backfill_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "comprehend:DetectSentiment",
+          "comprehend:BatchDetectSentiment",
+          "comprehend:DetectKeyPhrases",
+          "comprehend:BatchDetectKeyPhrases"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# IAM instance profile
+resource "aws_iam_instance_profile" "backfill_profile" {
+  name = "stock-news-analyzer-backfill-profile"
+  role = aws_iam_role.backfill_role.name
+}
+
+# Prepare user data script
+data "template_file" "backfill_user_data" {
+  template = file("${path.module}/scripts/user_data.sh")
+
+  vars = {
+    BACKFILL_SCRIPT_CONTENT = file("${path.module}/scripts/backfill_data.py")
+    DB_HOST                 = aws_db_instance.stock_news_analyzer_db.address
+    DB_USER                 = var.db_username
+    DB_PASS                 = var.db_password
+    DB_NAME                 = "stocknewsanalyzerdb"
+    ALPHA_VANTAGE_KEY       = var.alpha_vantage_key
+    AWS_REGION              = var.aws_region
+  }
+}
+
+resource "aws_instance" "backfill_instance" {
+  ami                    = data.aws_ami.amazonlinux.id
+  instance_type          = "t3.micro"  # Enough for the task
+  subnet_id              = aws_subnet.public_subnet.id  # Needs internet access
+  vpc_security_group_ids = [aws_security_group.backfill_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.backfill_profile.name
+
+  user_data = data.template_file.backfill_user_data.rendered
+
+  tags = {
+    Name = "stock-news-analyzer-backfill"
+  }
+
+  # Terminate instance after it completes (optional)
+  instance_initiated_shutdown_behavior = "terminate"
 }
