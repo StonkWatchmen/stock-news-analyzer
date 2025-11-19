@@ -14,7 +14,6 @@ export default function Watchlist() {
   const [watchlist, setWatchlist] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [userId, setUserId] = useState(null);
 
   // Get current Cognito user and ID token
   async function getCurrentUser() {
@@ -38,16 +37,14 @@ export default function Watchlist() {
     });
   }
 
-  // Fetch stocks and set userId
+  // Fetch all stocks from the backend
   useEffect(() => {
     async function fetchStocks() {
       setLoading(true);
       setError(null);
-      try {
-        const { token, userId: cognitoUserId } = await getCurrentUser();
-        if (!cognitoUserId) throw new Error("Failed to get user ID");
 
-        setUserId(cognitoUserId);
+      try {
+        const { token } = await getCurrentUser();
 
         const res = await fetch(`${API_BASE}/stocks`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -67,13 +64,16 @@ export default function Watchlist() {
     fetchStocks();
   }, []);
 
-  // Load watchlist from backend
+  // Load user's watchlist from backend
   useEffect(() => {
     async function loadWatchlist() {
-      if (!userId) return;
-
       try {
-        const res = await fetch(`${API_BASE}/watchlist?user_id=${userId}`);
+        const { token } = await getCurrentUser();
+
+        const res = await fetch(`${API_BASE}/watchlist`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         const json = await res.json();
 
@@ -87,20 +87,24 @@ export default function Watchlist() {
     }
 
     if (allStocks.length > 0) loadWatchlist();
-  }, [allStocks, userId]);
+  }, [allStocks]);
 
-  // Add/remove stocks (updates backend)
+  // Add stock to watchlist
   async function addToWatchlist(stock) {
-    if (!userId) return setError("User not logged in");
-
-    if (watchlist.some((s) => s.ticker === stock.ticker)) return;
-
     try {
+      const { token } = await getCurrentUser();
+
+      if (watchlist.some((s) => s.ticker === stock.ticker)) return;
+
       const res = await fetch(`${API_BASE}/watchlist`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, ticker: stock.ticker }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ticker: stock.ticker }),
       });
+
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       setWatchlist((prev) => [...prev, stock]);
     } catch (err) {
@@ -109,15 +113,20 @@ export default function Watchlist() {
     }
   }
 
+  // Remove stock from watchlist
   async function removeFromWatchlist(stock) {
-    if (!userId) return setError("User not logged in");
-
     try {
+      const { token } = await getCurrentUser();
+
       const res = await fetch(`${API_BASE}/watchlist`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, ticker: stock.ticker }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ticker: stock.ticker }),
       });
+
       if (!res.ok) throw new Error(`API error: ${res.status}`);
       setWatchlist((prev) => prev.filter((s) => s.ticker !== stock.ticker));
     } catch (err) {
@@ -129,10 +138,11 @@ export default function Watchlist() {
   return (
     <div className="watchlist-container">
       <h3>Your Watchlist</h3>
+
       {error && <div className="watchlist-error">{error}</div>}
       {loading && <div>Loading stocks...</div>}
 
-      {!loading && !error && (
+      {!loading && (
         <div className="watchlist-content">
           <div className="available-stocks">
             <h4>Available Stocks</h4>
