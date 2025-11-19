@@ -197,7 +197,7 @@ resource "aws_security_group_rule" "rds_from_backfill" {
 
 # IAM role for backfill EC2
 resource "aws_iam_role" "backfill_role" {
-  name = "stock-news-analyzer-backfill-role"
+  name = "stock-news-analyzer-backfill-role2"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
