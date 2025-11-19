@@ -66,10 +66,7 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
   username               = var.db_username                                              # Database admin username
   password               = var.db_password                                              # Replace with a secure password
   parameter_group_name   = "default.mysql8.0"                                           # Default parameter group for MySQL 8.0
-  skip_final_snapshot    = true
-  deletion_protection    = false
-  delete_automated_backups = true
-  backup_retention_period = 0
+  skip_final_snapshot    = true                                                         # Skip final snapshot when destroying the database
   vpc_security_group_ids = [aws_security_group.rds_sg.id]                               # Attach the RDS security group
   db_subnet_group_name   = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.name # Use the created subnet group
 }
@@ -84,20 +81,58 @@ resource "aws_instance" "db_init" {
 
   user_data = <<-EOF
     #!/bin/bash
+    yum update -y
     yum install -y mysql
 
-    # Retry loop until DB is ready
+    # Wait for DB to be ready
     until mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
                 -u ${var.db_username} \
                 -p${var.db_password} \
                 -e "SELECT 1" >/dev/null 2>&1; do
-        sleep 5
+        sleep 10
     done
 
+    # Create tables
     mysql -h ${aws_db_instance.stock_news_analyzer_db.address} \
           -u ${var.db_username} \
           -p${var.db_password} \
-          stocknewsanalyzerdb
+          stocknewsanalyzerdb << 'EOSQL'
+DROP TABLE IF EXISTS watchlist;
+DROP TABLE IF EXISTS prices;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS stocks;
+
+CREATE TABLE users (
+    id VARCHAR(36) PRIMARY KEY NOT NULL, 
+    email VARCHAR(64) NOT NULL,
+    password VARCHAR(64) DEFAULT NULL,
+    watchlist JSON DEFAULT '[]'
+);
+
+CREATE TABLE stocks (
+    id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+    ticker VARCHAR(10) NOT NULL UNIQUE
+);
+
+CREATE TABLE prices (
+    id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+    stock_id INT NOT NULL,
+    price DECIMAL(10, 2),
+    change_pct DECIMAL(5, 2),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (stock_id) REFERENCES stocks(id),
+    UNIQUE KEY unique_stock_price (stock_id)
+);
+
+INSERT INTO stocks (ticker) VALUES
+    ('AAPL'),
+    ('NFLX'),
+    ('AMZN'),
+    ('NVDA'),
+    ('META'),
+    ('MSFT'),
+    ('AMD');
+EOSQL
 
     shutdown -h now
   EOF
@@ -106,6 +141,7 @@ resource "aws_instance" "db_init" {
     Name = "db-init"
   }
 }
+
 
 resource "aws_iam_role" "ec2_role" {
   name = "stock-news-analyzer-ec2-role"
