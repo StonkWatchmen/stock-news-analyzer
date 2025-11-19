@@ -109,3 +109,19 @@
     transform: scale(1.02);
   }
   
+  .signout-btn {
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+  
+  .signout-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.03);
+  }
+  
