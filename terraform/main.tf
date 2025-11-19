@@ -195,11 +195,11 @@ resource "null_resource" "package_lambda_stocks" {
 resource "null_resource" "package_lambda_init" {
   provisioner "local-exec" {
     command = <<EOT
-      rm -rf ${path.module}/build/init_rds \
-      mkdir -p ${path.module}/build/init_rds/sql \
-      cp -r ${path.module}/lambda/init_rds/sql/ ${path.module}/build/init_rds/sql/ \  
-      cp ${path.module}/lambda/init_rds/handler.py ${path.module}/build/init_rds/ \
-      pip install -r ${path.module}/lambda/init_rds/requirements.txt -t ${path.module}/build/init_rds/ \ 
+      rm -rf ${path.module}/build/init_rds 
+      mkdir -p ${path.module}/build/init_rds/sql 
+      cp -r ${path.module}/lambda/init_rds/sql/ ${path.module}/build/init_rds/sql/   
+      cp ${path.module}/lambda/init_rds/handler.py ${path.module}/build/init_rds/ 
+      pip install -r ${path.module}/lambda/init_rds/requirements.txt -t ${path.module}/build/init_rds/
     EOT
   }
 
