@@ -11,9 +11,5 @@ resource "aws_lambda_invocation" "init_database" {
     aws_lambda_function.init_db_lambda
   ]
 
-  lifecycle {
-    replace_triggered_by = [
-      aws_db_instance.stock_news_analyzer_db
-    ]
-  }
+
 }

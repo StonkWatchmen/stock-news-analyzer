@@ -178,14 +178,7 @@ resource "aws_cognito_user_pool_domain" "auth_domain" {
   user_pool_id = aws_cognito_user_pool.user_pool.id
 }
 
-# Lambda permission for Cognito trigger
-resource "aws_lambda_permission" "cognito_invoke_add_user" {
-  statement_id  = "AllowCognitoInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.add_user.function_name
-  principal     = "cognito-idp.amazonaws.com"
-  source_arn    = aws_cognito_user_pool.user_pool.arn
-}
+
 resource "null_resource" "package_lambda_stocks" {
   provisioner "local-exec" {
     command = <<EOT
@@ -217,82 +210,3 @@ resource "null_resource" "package_lambda_init" {
   }
 }
 
-resource "null_resource" "package_lambda_add_user" {
-  provisioner "local-exec" {
-    command = <<EOT
-      rm -rf ${path.module}/build/add_user
-      mkdir -p ${path.module}/build/add_user
-      cp ${path.module}/lambda/add_user/handler.py ${path.module}/build/add_user/
-      pip install -r ${path.module}/lambda/add_user/requirements.txt -t ${path.module}/build/add_user/
-    EOT
-  }
-
-  triggers = {
-    always_run = timestamp()
-  }
-}
-
-resource "null_resource" "package_lambda_get_users" {
-  provisioner "local-exec" {
-    command = <<EOT
-      rm -rf ${path.module}/build/get_users
-      mkdir -p ${path.module}/build/get_users
-      cp ${path.module}/lambda/get_users/handler.py ${path.module}/build/get_users/
-      pip install -r ${path.module}/lambda/get_users/requirements.txt -t ${path.module}/build/get_users/
-    EOT
-  }
-
-  triggers = {
-    always_run = timestamp()
-  }
-}
-
-# Lambda function for adding users (Cognito trigger)
-resource "aws_lambda_function" "add_user" {
-  function_name = "add-user-lambda"
-  role          = aws_iam_role.lambda_role.arn
-  handler       = "handler.lambda_handler"
-  runtime       = "python3.12"
-  timeout       = 15
-  filename         = data.archive_file.add_user_zip.output_path
-  source_code_hash = data.archive_file.add_user_zip.output_base64sha256
-
-  environment {
-    variables = {
-      DB_HOST = aws_db_instance.stock_news_analyzer_db.address
-      DB_USER = var.db_username
-      DB_PASS = var.db_password
-      DB_NAME = "stocknewsanalyzerdb"
-    }
-  }
-
-  vpc_config {
-    subnet_ids         = [aws_subnet.private_subnet.id]
-    security_group_ids = [aws_security_group.lambda_sg.id]
-  }
-}
-
-# Lambda function for getting users
-resource "aws_lambda_function" "get_users" {
-  function_name = "get-users-lambda"
-  role          = aws_iam_role.lambda_role.arn
-  handler       = "handler.lambda_handler"
-  runtime       = "python3.12"
-  timeout       = 15
-  filename         = data.archive_file.get_users_zip.output_path
-  source_code_hash = data.archive_file.get_users_zip.output_base64sha256
-
-  environment {
-    variables = {
-      DB_HOST = aws_db_instance.stock_news_analyzer_db.address
-      DB_USER = var.db_username
-      DB_PASS = var.db_password
-      DB_NAME = "stocknewsanalyzerdb"
-    }
-  }
-
-  vpc_config {
-    subnet_ids         = [aws_subnet.private_subnet.id]
-    security_group_ids = [aws_security_group.lambda_sg.id]
-  }
-}
