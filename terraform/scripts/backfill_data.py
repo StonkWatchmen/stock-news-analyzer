@@ -39,7 +39,7 @@ def get_stocks(conn):
         cursor.execute("SELECT id, ticker FROM stocks ORDER BY ticker")
         return cursor.fetchall()
 
-def fetch_time_series_daily(ticker, outputsize='full'):
+def fetch_time_series_daily(ticker):
     """Fetch daily time series data from Alpha Vantage"""
     if not ALPHA_VANTAGE_KEY:
         print("ERROR: ALPHA_VANTAGE_KEY not set")
@@ -50,128 +50,132 @@ def fetch_time_series_daily(ticker, outputsize='full'):
         'function': 'TIME_SERIES_DAILY',
         'symbol': ticker,
         'apikey': ALPHA_VANTAGE_KEY,
-        'outputsize': outputsize  # 'compact' = last 100 days, 'full' = 20+ years
+        'outputsize': 'compact'  # Last 100 days
     }
     
     try:
+        print(f"  Fetching price data for {ticker}...")
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
         
         if 'Time Series (Daily)' not in data:
-            print(f"No time series data for {ticker}")
+            print(f"  ⚠ No time series data for {ticker}")
+            if 'Note' in data:
+                print(f"  API Note: {data['Note']}")
             return None
         
         return data['Time Series (Daily)']
     
     except Exception as e:
-        print(f"Error fetching time series for {ticker}: {e}")
+        print(f"  ✗ Error fetching time series for {ticker}: {e}")
         return None
 
-def fetch_news_for_date_range(ticker, start_date, end_date):
-    """Fetch news articles for a ticker in a date range"""
+def fetch_news(ticker):
+    """Fetch news articles for a ticker (last 3 months)"""
     if not ALPHA_VANTAGE_KEY:
         return []
     
     url = 'https://www.alphavantage.co/query'
+    
+    # Calculate 3 months ago
+    start_date = datetime.now() - timedelta(days=90)
+    
     params = {
         'function': 'NEWS_SENTIMENT',
         'tickers': ticker,
         'apikey': ALPHA_VANTAGE_KEY,
         'time_from': start_date.strftime('%Y%m%dT0000'),
-        'time_to': end_date.strftime('%Y%m%dT2359'),
         'limit': 200,
         'sort': 'LATEST'
     }
     
     try:
+        print(f"  Fetching news for {ticker}...")
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
         return data.get('feed', [])
     
     except Exception as e:
-        print(f"Error fetching news for {ticker} ({start_date} to {end_date}): {e}")
+        print(f"  ✗ Error fetching news for {ticker}: {e}")
         return []
 
-def extract_keywords(text):
-    """Extract keywords using Comprehend"""
-    if not comprehend:
-        return ""
+def batch_analyze_sentiment(texts):
+    """Batch analyze sentiment for multiple texts"""
+    if not comprehend or not texts:
+        return [0.0] * len(texts)
     
-    try:
-        if len(text.encode('utf-8')) > 5000:
-            text = text[:1200]
-        
-        response = comprehend.detect_key_phrases(
-            Text=text,
-            LanguageCode='en'
-        )
-        
-        keywords = [phrase['Text'] for phrase in response.get('KeyPhrases', [])[:10]]
-        return ', '.join(keywords)
+    results = []
     
-    except Exception as e:
-        print(f"Error extracting keywords: {e}")
-        return ""
+    # Process in batches of 25 (Comprehend limit)
+    batch_size = 25
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        
+        # Truncate texts to 5000 bytes
+        truncated_batch = []
+        for text in batch:
+            if len(text.encode('utf-8')) > 5000:
+                text = text[:1200]
+            truncated_batch.append(text)
+        
+        try:
+            response = comprehend.batch_detect_sentiment(
+                TextList=truncated_batch,
+                LanguageCode='en'
+            )
+            
+            for result in response['ResultList']:
+                scores = result['SentimentScore']
+                sentiment_score = scores['Positive'] - scores['Negative']
+                results.append(sentiment_score)
+        
+        except Exception as e:
+            print(f"    ⚠ Batch sentiment error: {e}")
+            results.extend([0.0] * len(batch))
+    
+    return results
 
-def analyze_sentiment(text):
-    """Analyze sentiment using Comprehend"""
-    if not comprehend:
-        return None
+def batch_extract_keywords(texts):
+    """Batch extract keywords for multiple texts"""
+    if not comprehend or not texts:
+        return [""] * len(texts)
     
-    try:
-        if len(text.encode('utf-8')) > 5000:
-            text = text[:1200]
-        
-        response = comprehend.detect_sentiment(
-            Text=text,
-            LanguageCode='en'
-        )
-        
-        scores = response['SentimentScore']
-        sentiment_score = scores['Positive'] - scores['Negative']
-        
-        return sentiment_score
+    results = []
     
-    except Exception as e:
-        print(f"Error analyzing sentiment: {e}")
-        return None
-
-def store_article(conn, stock_id, title, keywords, sentiment_score, recorded_at):
-    """Store article in article_history"""
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO article_history (stock_id, title, keywords, sentiment_score, recorded_at)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (stock_id, title[:500], keywords, sentiment_score, recorded_at))
-        conn.commit()
-        return True
-    except Exception as e:
-        print(f"Error storing article: {e}")
-        conn.rollback()
-        return False
-
-def store_stock_history(conn, stock_id, price, avg_sentiment, recorded_at):
-    """Store stock history record"""
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO stock_history (stock_id, price, avg_sentiment, recorded_at)
-                VALUES (%s, %s, %s, %s)
-            """, (stock_id, price, avg_sentiment, recorded_at))
-        conn.commit()
-        return True
-    except Exception as e:
-        print(f"Error storing stock history: {e}")
-        conn.rollback()
-        return False
+    # Process in batches of 25
+    batch_size = 25
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        
+        # Truncate texts
+        truncated_batch = []
+        for text in batch:
+            if len(text.encode('utf-8')) > 5000:
+                text = text[:1200]
+            truncated_batch.append(text)
+        
+        try:
+            response = comprehend.batch_detect_key_phrases(
+                TextList=truncated_batch,
+                LanguageCode='en'
+            )
+            
+            for result in response['ResultList']:
+                keywords = [phrase['Text'] for phrase in result.get('KeyPhrases', [])[:10]]
+                results.append(', '.join(keywords))
+        
+        except Exception as e:
+            print(f"    ⚠ Batch keywords error: {e}")
+            results.extend([""] * len(batch))
+    
+    return results
 
 def backfill_stock(conn, stock_id, ticker, months=3):
     """Backfill historical data for a stock"""
     print(f"\n{'='*60}")
-    print(f"Backfilling {ticker} - Last {months} months")
+    print(f"Processing {ticker}")
     print(f"{'='*60}")
     
     # Calculate date range
@@ -179,15 +183,14 @@ def backfill_stock(conn, stock_id, ticker, months=3):
     start_date = end_date - timedelta(days=months*30)
     
     # 1. Fetch historical prices
-    print(f"\nFetching price history for {ticker}...")
-    time_series = fetch_time_series_daily(ticker, outputsize='compact')
+    time_series = fetch_time_series_daily(ticker)
     
     if not time_series:
-        print(f"No price data available for {ticker}")
+        print(f"  ✗ Skipping {ticker} - no price data")
         return False
     
-    # Filter to last 3 months
-    prices_stored = 0
+    # Store prices
+    prices_to_store = []
     for date_str, daily_data in time_series.items():
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
         
@@ -195,95 +198,117 @@ def backfill_stock(conn, stock_id, ticker, months=3):
             continue
         
         close_price = float(daily_data.get('4. close', 0))
-        
-        # For now, store with null sentiment (will be filled by news)
-        if store_stock_history(conn, stock_id, close_price, None, date_obj):
-            prices_stored += 1
+        prices_to_store.append((stock_id, close_price, date_obj))
     
-    print(f"Stored {prices_stored} price records")
+    # Bulk insert prices
+    with conn.cursor() as cursor:
+        cursor.executemany("""
+            INSERT INTO stock_history (stock_id, price, avg_sentiment, recorded_at)
+            VALUES (%s, %s, NULL, %s)
+        """, prices_to_store)
+    conn.commit()
+    print(f"  ✓ Stored {len(prices_to_store)} price records")
     
-    # Rate limit - Alpha Vantage free tier: 5 calls/min, 500 calls/day
-    print("Waiting 15 seconds (API rate limit)...")
-    time.sleep(15)
+    # Rate limit between API calls
+    time.sleep(1)
     
-    # 2. Fetch news and calculate daily sentiment
-    print(f"\nFetching news for {ticker}...")
+    # 2. Fetch and process news
+    articles = fetch_news(ticker)
+    print(f"  ✓ Found {len(articles)} articles")
     
-    # Fetch news in weekly chunks to avoid overwhelming the API
-    current_date = start_date
-    total_articles = 0
+    if not articles:
+        print(f"  ⚠ No articles to process")
+        return True
     
-    while current_date < end_date:
-        chunk_end = min(current_date + timedelta(days=7), end_date)
-        
-        articles = fetch_news_for_date_range(ticker, current_date, chunk_end)
-        print(f"Found {len(articles)} articles from {current_date.date()} to {chunk_end.date()}")
-        
-        # Process articles
-        daily_sentiments = {}  # date -> list of sentiment scores
-        
-        for article in articles:
-            title = article.get('title', '')
-            summary = article.get('summary', '')
-            time_published = article.get('time_published', '')
-            
-            if not title or not time_published:
-                continue
-            
-            try:
-                published_dt = datetime.strptime(time_published, '%Y%m%dT%H%M%S')
-                published_date = published_dt.date()
-            except ValueError:
-                continue
-            
-            text = f"{title}. {summary}"
-            
-            # Extract keywords and sentiment
-            keywords = extract_keywords(text) if comprehend else ""
-            sentiment_score = analyze_sentiment(text) if comprehend else 0.0
-            
-            if sentiment_score is not None:
-                # Store article
-                store_article(conn, stock_id, title, keywords, sentiment_score, published_dt)
-                
-                # Track for daily average
-                if published_date not in daily_sentiments:
-                    daily_sentiments[published_date] = []
-                daily_sentiments[published_date].append(sentiment_score)
-                
-                total_articles += 1
-            
-            # Small delay between Comprehend calls
-            time.sleep(0.3)
-        
-        # Update stock_history with average daily sentiment
-        for date, sentiments in daily_sentiments.items():
-            avg_sentiment = sum(sentiments) / len(sentiments)
-            
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    UPDATE stock_history
-                    SET avg_sentiment = %s
-                    WHERE stock_id = %s 
-                    AND DATE(recorded_at) = %s
-                    AND avg_sentiment IS NULL
-                """, (avg_sentiment, stock_id, date))
-            conn.commit()
-        
-        current_date = chunk_end
-        
-        # Rate limit between chunks
-        print("Waiting 15 seconds (API rate limit)...")
-        time.sleep(15)
+    # Prepare article data for batch processing
+    article_texts = []
+    article_data = []
     
-    print(f"\nCompleted backfill for {ticker}:")
-    print(f"  - {prices_stored} price records")
-    print(f"  - {total_articles} articles processed")
+    for article in articles:
+        title = article.get('title', '')
+        summary = article.get('summary', '')
+        time_published = article.get('time_published', '')
+        
+        if not title or not time_published:
+            continue
+        
+        try:
+            published_dt = datetime.strptime(time_published, '%Y%m%dT%H%M%S')
+        except ValueError:
+            continue
+        
+        text = f"{title}. {summary}"
+        article_texts.append(text)
+        article_data.append({
+            'title': title[:500],
+            'published_dt': published_dt,
+            'published_date': published_dt.date()
+        })
     
+    if not article_texts:
+        print(f"  ⚠ No valid articles to process")
+        return True
+    
+    print(f"  Processing {len(article_texts)} articles with Comprehend...")
+    
+    # Batch process sentiment and keywords
+    sentiments = batch_analyze_sentiment(article_texts)
+    keywords_list = batch_extract_keywords(article_texts)
+    
+    # Store articles and track daily sentiments
+    daily_sentiments = {}  # date -> list of sentiment scores
+    articles_to_store = []
+    
+    for i, data in enumerate(article_data):
+        sentiment = sentiments[i]
+        keywords = keywords_list[i]
+        
+        articles_to_store.append((
+            stock_id,
+            data['title'],
+            keywords,
+            sentiment,
+            data['published_dt']
+        ))
+        
+        # Track for daily average
+        date = data['published_date']
+        if date not in daily_sentiments:
+            daily_sentiments[date] = []
+        daily_sentiments[date].append(sentiment)
+    
+    # Bulk insert articles
+    with conn.cursor() as cursor:
+        cursor.executemany("""
+            INSERT INTO article_history (stock_id, title, keywords, sentiment_score, recorded_at)
+            VALUES (%s, %s, %s, %s, %s)
+        """, articles_to_store)
+    conn.commit()
+    print(f"  ✓ Stored {len(articles_to_store)} articles")
+    
+    # Update stock_history with average daily sentiment
+    sentiment_updates = []
+    for date, sentiments in daily_sentiments.items():
+        avg_sentiment = sum(sentiments) / len(sentiments)
+        sentiment_updates.append((avg_sentiment, stock_id, date))
+    
+    with conn.cursor() as cursor:
+        cursor.executemany("""
+            UPDATE stock_history
+            SET avg_sentiment = %s
+            WHERE stock_id = %s 
+            AND DATE(recorded_at) = %s
+        """, sentiment_updates)
+    conn.commit()
+    print(f"  ✓ Updated sentiment for {len(sentiment_updates)} days")
+    
+    print(f"  ✓ Completed {ticker}")
     return True
 
 def main():
     """Main backfill process"""
+    start_time = time.time()
+    
     print("="*60)
     print("Stock News Analyzer - Historical Data Backfill")
     print("="*60)
@@ -315,20 +340,29 @@ def main():
     # Backfill each stock
     success_count = 0
     for i, stock in enumerate(stocks, 1):
-        print(f"\n[{i}/{len(stocks)}] Processing {stock['ticker']}...")
+        print(f"\n[{i}/{len(stocks)}] Starting {stock['ticker']}...")
         
         try:
             if backfill_stock(conn, stock['id'], stock['ticker'], months=3):
                 success_count += 1
         except Exception as e:
-            print(f"ERROR processing {stock['ticker']}: {e}")
+            print(f"  ✗ ERROR processing {stock['ticker']}: {e}")
+            import traceback
+            traceback.print_exc()
             continue
+        
+        # Small delay between stocks (API rate limit)
+        if i < len(stocks):
+            time.sleep(1)
     
     conn.close()
+    
+    elapsed = time.time() - start_time
     
     print("\n" + "="*60)
     print("BACKFILL COMPLETE")
     print(f"Successfully backfilled {success_count}/{len(stocks)} stocks")
+    print(f"Time elapsed: {elapsed:.1f} seconds ({elapsed/60:.1f} minutes)")
     print("="*60)
 
 if __name__ == "__main__":

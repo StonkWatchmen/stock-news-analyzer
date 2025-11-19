@@ -216,7 +216,7 @@ resource "null_resource" "package_lambda_init" {
 resource "aws_security_group" "backfill_sg" {
   name        = "stock-news-analyzer-backfill-sg"
   description = "Security group for backfill EC2 instance"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = aws_vpc.stock_news_analyzer_vpc.id
 
   # Allow outbound to internet (for Alpha Vantage API)
   egress {
@@ -311,7 +311,7 @@ resource "aws_instance" "backfill_instance" {
   count = var.run_backfill ? 1 : 0  # Only create if variable is true
 
   ami                    = data.aws_ami.amazonlinux.id
-  instance_type          = "t3.small"  # Enough for the task
+  instance_type          = "t3.micro"  # Enough for the task
   subnet_id              = aws_subnet.public_subnet.id  # Needs internet access
   vpc_security_group_ids = [aws_security_group.backfill_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.backfill_profile.name
