@@ -26,8 +26,8 @@ resource "null_resource" "package_lambda_add_user" {
   provisioner "local-exec" {
     command = <<EOT
       rm -rf ${path.module}/build/add_user
-      mkdir -p ${path.module}/build/add_user/sql
-      cp -r ${path.module}/lambda/add_user/sql/* ${path.module}/build/add_user/sql/
+      mkdir -p ${path.module}/build/add_user/
+      cp -r ${path.module}/lambda/add_user/* ${path.module}/build/add_user/
       cp ${path.module}/lambda/add_user/handler.py ${path.module}/build/add_user/
       pip install -r ${path.module}/lambda/add_user/requirements.txt -t ${path.module}/build/add_user/
     EOT
@@ -76,8 +76,8 @@ resource "null_resource" "package_lambda_get_users" {
   provisioner "local-exec" {
     command = <<EOT
       rm -rf ${path.module}/build/get_users
-      mkdir -p ${path.module}/build/get_users/sql
-      cp -r ${path.module}/lambda/get_users/sql/* ${path.module}/build/get_users/sql/
+      mkdir -p ${path.module}/build/get_users/
+      cp -r ${path.module}/lambda/get_users/* ${path.module}/build/get_users/
       cp ${path.module}/lambda/get_users/handler.py ${path.module}/build/get_users/
       pip install -r ${path.module}/lambda/get_users/requirements.txt -t ${path.module}/build/get_users/
     EOT
