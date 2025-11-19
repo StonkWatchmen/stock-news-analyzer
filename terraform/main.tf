@@ -213,7 +213,7 @@ resource "null_resource" "package_lambda_notifs" {
     command = <<EOT
       rm -rf ${path.module}/build/attach_notifs
       mkdir -p ${path.module}/build/attach_notifs
-      cp -r ${path.module}/lambda/attach_notifs/* ${path.module}/build/attach_notifs
+      cp -r ${path.module}/lambda/attach_notifs ${path.module}/build/attach_notifs
       cp ${path.module}/lambda/attach_notifs/handler.py ${path.module}/build/attach_notifs/
       pip install -r ${path.module}/lambda/attach_notifs/requirements.txt -t ${path.module}/build/attach_notifs/
     EOT
