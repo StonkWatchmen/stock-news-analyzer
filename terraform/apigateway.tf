@@ -40,31 +40,6 @@ resource "aws_api_gateway_authorizer" "cognito_authorizer" {
 }
 
 # ========================================
-# API Gateway Gateway Responses for CORS
-# ========================================
-resource "aws_api_gateway_gateway_response" "cors_4xx" {
-  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  response_type = "DEFAULT_4XX"
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "cors_5xx" {
-  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  response_type = "DEFAULT_5XX"
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
-  }
-}
-
-# ========================================
 # API Gateway Methods - /stocks
 # ========================================
 resource "aws_api_gateway_method" "get_stocks" {
