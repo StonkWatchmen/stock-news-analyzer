@@ -2,7 +2,6 @@ import React from "react";
 import Watchlist from "../components/Watchlist";
 import Chart from "../components/Chart";
 import SignOut from "./SignOut";
-import "./Dashboard.css";
 
 function Dashboard() {
   return (
