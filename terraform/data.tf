@@ -68,8 +68,15 @@ data "archive_file" "add_user_zip" {
 }
 
 data "archive_file" "get_users_zip" {
-  depends_on  = [null_resource.package_lambda_add_user]
+  depends_on  = [null_resource.package_lambda_get_user]
   type        = "zip"
   source_dir  = "${path.module}/build/get_users"
   output_path = "${path.module}/get_users.zip"
+}
+
+data "attach_notifs" "attach_notifs_zip" {
+  depends_on = [null_resource.package_lambda_notifs]
+  type        = "zip"
+  source_dir  = "${path.module}/build/attach_notifs"
+  output_path = "${path.module}/attach_notifs.zip"
 }

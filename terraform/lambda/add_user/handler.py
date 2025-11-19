@@ -1,5 +1,9 @@
 import os
 import pymysql
+import boto3
+import json
+
+sns = boto3.client("lambda")
 
 def get_connection():
     """Establish a connection to the RDS MySQL instance."""
@@ -24,4 +28,13 @@ def lambda_handler(event, context):
         # ensure watchlist JSON is initialized as empty array
         cur.execute("INSERT INTO users (id, email, watchlist) VALUES (%s, %s, %s)", (user, email, '[]'))
         conn.commit()
+
+    payload = {"message": email}
+
+    response = lambda_client.invoke(
+        FunctionName="attach_notifs_lambda",
+        InvocationType="Event",   # Async (fire-and-forget)
+        Payload=json.dumps(payload),
+    )
+
     return event
