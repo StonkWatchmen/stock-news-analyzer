@@ -177,8 +177,6 @@ resource "aws_cognito_user_pool_domain" "auth_domain" {
   domain       = "stock-news-analyzer-${var.environment}"
   user_pool_id = aws_cognito_user_pool.user_pool.id
 }
-
-
 resource "null_resource" "package_lambda_stocks" {
   provisioner "local-exec" {
     command = <<EOT
@@ -209,4 +207,3 @@ resource "null_resource" "package_lambda_init" {
     always_run = timestamp()
   }
 }
-
