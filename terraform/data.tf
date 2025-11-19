@@ -73,3 +73,11 @@ data "archive_file" "get_users_zip" {
   source_dir  = "${path.module}/build/get_users"
   output_path = "${path.module}/get_users.zip"
 }
+
+# Create ZIP archive for scheduler Lambda
+data "archive_file" "scheduler_zip" {
+  depends_on  = [null_resource.package_lambda_scheduler]
+  type        = "zip"
+  source_dir  = "${path.module}/build/scheduler"
+  output_path = "${path.module}/scheduler.zip"
+}

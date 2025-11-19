@@ -3,13 +3,13 @@ import json
 # import pymysql
 import urllib.request, urllib.parse
 from decimal import Decimal
-from datetime import datetime, date
 import boto3
 import traceback  # <--- added for debugging unexpected errors
 try:
     import pymysql
 except ImportError:
     pymysql = None
+from datetime import datetime, timedelta, date
 
 
 comprehend = boto3.client('comprehend')
@@ -19,7 +19,92 @@ DB_PASS = os.environ['DB_PASS']
 DB_NAME = os.environ['DB_NAME']
 ALPHA_VANTAGE_KEY = os.environ.get('ALPHA_VANTAGE_KEY')  
 
-
+def get_stock_history(conn, stock_id=None, ticker=None, time_range="24h"):
+    """
+    Get stock history records for a specific time range
+    Aggregates data appropriately based on the time range
+    """
+    
+    # Calculate the start time based on range
+    now = datetime.utcnow()  # Use UTC to match database timestamps
+    time_ranges = {
+        '24h': now - timedelta(hours=24),
+        '7d': now - timedelta(days=7),
+        '30d': now - timedelta(days=30),
+        '90d': now - timedelta(days=90),
+        '1y': now - timedelta(days=365),
+        'all': datetime(2000, 1, 1)
+    }
+    
+    start_time = time_ranges.get(time_range, time_ranges['24h'])
+    
+    # Determine aggregation interval based on time range
+    if time_range == '24h':
+        # Hourly aggregation for 24 hours
+        group_format = '%Y-%m-%d %H:00:00'
+        interval_sql = "DATE_FORMAT(recorded_at, '%Y-%m-%d %H:00:00')"
+    elif time_range in ['7d', '30d']:
+        # Daily aggregation for week/month
+        group_format = '%Y-%m-%d'
+        interval_sql = "DATE(recorded_at)"
+    elif time_range == '90d':
+        # Weekly aggregation for 90 days
+        group_format = '%Y-%U'
+        interval_sql = "DATE_FORMAT(recorded_at, '%Y-%U')"
+    else:
+        # Monthly aggregation for year/all time
+        group_format = '%Y-%m'
+        interval_sql = "DATE_FORMAT(recorded_at, '%Y-%m-01')"
+    
+    with conn.cursor() as cursor:
+        if stock_id:
+            cursor.execute(f"""
+                SELECT 
+                    s.ticker,
+                    {interval_sql} as time_bucket,
+                    AVG(sh.price) as avg_price,
+                    AVG(sh.avg_sentiment) as avg_sentiment,
+                    MAX(sh.recorded_at) as latest_time
+                FROM stock_history sh
+                JOIN stocks s ON sh.stock_id = s.id
+                WHERE sh.stock_id = %s 
+                AND sh.recorded_at >= %s
+                AND sh.recorded_at <= %s
+                GROUP BY s.ticker, time_bucket
+                ORDER BY time_bucket ASC
+            """, (stock_id, start_time, now))
+        elif ticker:
+            cursor.execute(f"""
+                SELECT 
+                    s.ticker,
+                    {interval_sql} as time_bucket,
+                    AVG(sh.price) as avg_price,
+                    AVG(sh.avg_sentiment) as avg_sentiment,
+                    MAX(sh.recorded_at) as latest_time
+                FROM stock_history sh
+                JOIN stocks s ON sh.stock_id = s.id
+                WHERE s.ticker = %s 
+                AND sh.recorded_at >= %s
+                AND sh.recorded_at <= %s
+                GROUP BY s.ticker, time_bucket
+                ORDER BY time_bucket ASC
+            """, (ticker.upper(), start_time, now))
+        else:
+            return []
+        
+        rows = cursor.fetchall()
+        
+        # Format the results
+        results = []
+        for row in rows:
+            results.append({
+                'ticker': row['ticker'],
+                'price': float(row['avg_price']) if row['avg_price'] else None,
+                'avg_sentiment': float(row['avg_sentiment']) if row['avg_sentiment'] else None,
+                'recorded_at': row['latest_time'].isoformat() if row['latest_time'] else None
+            })
+        
+        return results
 # Custom JSON encoder to handle Decimal and datetime objects
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -317,7 +402,30 @@ def lambda_handler(event, context):
                 if not user_id:
                     return _resp(400, {"error": "user_id is required"})
                 tickers = get_watchlist(conn, user_id)
-                return _resp(200, {"user_id": user_id, "tickers": tickers})
+                return _resp(200, {"user_id": int(user_id), "tickers": tickers})
+            # GET /stock-history?ticker=AAPL&range=7d
+            if path.endswith("/stock-history") and method == "GET":
+                qs = event.get("queryStringParameters") or {}
+                stock_id = qs.get("stock_id")
+                ticker = qs.get("ticker")
+                time_range = qs.get("range", "24h")  # Default to 24 hours
+                
+                if not stock_id and not ticker:
+                    return _resp(400, {"error": "stock_id or ticker is required"})
+                
+                history = get_stock_history(
+                    conn, 
+                    stock_id=int(stock_id) if stock_id else None,
+                    ticker=ticker,
+                    time_range=time_range
+                )
+                
+                return _resp(200, {
+                    "ticker": ticker.upper() if ticker else None,
+                    "time_range": time_range,
+                    "history": history,
+                    "count": len(history)
+                })
 
             # GET /quotes?tickers=AAPL,MSFT
             if path.endswith("/quotes") and method == "GET":
