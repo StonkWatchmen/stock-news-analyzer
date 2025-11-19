@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
+import { CognitoUserPool } from "amazon-cognito-identity-js";
 import "./Watchlist.css";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL;
+
+const userPool = new CognitoUserPool({
+  UserPoolId: process.env.REACT_APP_COGNITO_USER_POOL_ID,
+  ClientId: process.env.REACT_APP_COGNITO_CLIENT_ID,
+});
 
 export default function Watchlist() {
   const [allStocks, setAllStocks] = useState([]);
@@ -9,13 +15,39 @@ export default function Watchlist() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Get the current user's ID token
+  function getIdToken() {
+    return new Promise((resolve, reject) => {
+      const currentUser = userPool.getCurrentUser();
+      if (!currentUser) {
+        reject(new Error("No user logged in"));
+        return;
+      }
+
+      currentUser.getSession((err, session) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve(session.getIdToken().getJwtToken());
+      });
+    });
+  }
+
   // Fetch all available stocks from the backend
   useEffect(() => {
     async function fetchStocks() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${API_BASE}/stocks`);
+        const token = await getIdToken();
+        
+        const res = await fetch(`${API_BASE}/stocks`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         const json = await res.json();
         setAllStocks(json.stocks || []);

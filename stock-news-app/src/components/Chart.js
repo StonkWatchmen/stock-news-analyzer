@@ -25,10 +25,10 @@ export default function Chart() {
         console.error("Missing REACT_APP_API_BASE_URL");
         return;
       }
-
+  
       setLoading(true);
       setError(null);
-
+  
       try {
         const res = await fetch(
           `${API_BASE}/stock-history?ticker=${ticker}&range=${timeRange}`
@@ -37,30 +37,53 @@ export default function Chart() {
         if (!res.ok) {
           throw new Error(`API error: ${res.status}`);
         }
-
+  
         const json = await res.json();
         const history = json.history || [];
-
+  
         // Transform data for the chart
-        const chartData = history.map((record) => ({
-          date: new Date(record.recorded_at).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "America/New_York", // Force EST
-          }),
-          price: parseFloat(record.price) || 0,
-          sentiment: parseFloat(record.avg_sentiment) || 0,
-          timestamp: record.recorded_at,
-        }));
-
-        // Sort data by timestamp (oldest → newest)
-        const sortedData = chartData.sort(
-          (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
-        );
-
-        setData(sortedData);
+        const chartData = history.map((record) => {
+          const recordDate = new Date(record.recorded_at);
+          
+          // Format date based on time range
+          let dateLabel;
+          if (timeRange === '24h') {
+            dateLabel = recordDate.toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          } else if (timeRange === '7d' || timeRange === '30d') {
+            dateLabel = recordDate.toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+            });
+          } else if (timeRange === '90d') {
+            dateLabel = recordDate.toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+            });
+          } else {
+            dateLabel = recordDate.toLocaleString("en-US", {
+              month: "short",
+              year: "numeric",
+            });
+          }
+  
+          return {
+            date: dateLabel,
+            price: parseFloat(record.price) || 0,
+            sentiment: record.avg_sentiment !== null ? parseFloat(record.avg_sentiment) : null,
+            timestamp: record.recorded_at,
+          };
+        });
+  
+        // Filter out any future dates (shouldn't happen, but just in case)
+        const now = new Date();
+        const filteredData = chartData.filter(d => new Date(d.timestamp) <= now);
+  
+        setData(filteredData);
       } catch (err) {
         console.error("Failed to load stock history:", err);
         setError(err.message);
@@ -68,7 +91,7 @@ export default function Chart() {
         setLoading(false);
       }
     }
-
+  
     loadStockHistory();
   }, [ticker, timeRange]);
 
