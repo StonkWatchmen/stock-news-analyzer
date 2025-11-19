@@ -296,12 +296,12 @@ resource "aws_s3_bucket" "backfill_scripts" {
 resource "aws_s3_object" "backfill_script" {
   bucket = aws_s3_bucket.backfill_scripts.id
   key = "backfill_data.py"
-  source = "${path.module}/backfill_data.py"
+  source = "${path.module}/scripts/backfill_data.py"
 }
 
 # Upload requirements.txt
 resource "aws_s3_object" "requirements" {
   bucket = aws_s3_bucket.backfill_scripts.id
   key = "requirements.txt"
-  source = "${path.module}/requirements.txt"
+  source = "${path.module}/scripts/requirements.txt"
 }
