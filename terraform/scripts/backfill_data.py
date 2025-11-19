@@ -100,7 +100,7 @@ def fetch_time_series_daily(ticker):
         'function': 'TIME_SERIES_DAILY',
         'symbol': ticker,
         'apikey': ALPHA_VANTAGE_KEY,
-        'outputsize': 'compact'  # Last 100 days
+        'outputsize': 'full'  # Last 100 days
     }
     
     try:
@@ -129,7 +129,7 @@ def fetch_news(ticker):
     url = 'https://www.alphavantage.co/query'
     
     # Calculate 3 months ago
-    start_date = datetime.now() - timedelta(days=90)
+    start_date = datetime.now() - timedelta(days=365)
     
     params = {
         'function': 'NEWS_SENTIMENT',
@@ -222,7 +222,7 @@ def batch_extract_keywords(texts):
     
     return results
 
-def backfill_stock(conn, stock_id, ticker, months=3):
+def backfill_stock(conn, stock_id, ticker, months=12):
     """Backfill historical data for a stock"""
     print(f"\n{'='*60}")
     print(f"Processing {ticker}")

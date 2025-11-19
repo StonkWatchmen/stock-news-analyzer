@@ -43,22 +43,24 @@ export default function Chart() {
 
         // Transform data for the chart
         const chartData = history.map((record) => ({
-          // Format date for display
           date: new Date(record.recorded_at).toLocaleString("en-US", {
             month: "short",
             day: "numeric",
             hour: "2-digit",
             minute: "2-digit",
+            timeZone: "America/New_York", // Force EST
           }),
-          // Price data
           price: parseFloat(record.price) || 0,
-          // Sentiment data (scale -1 to 1)
           sentiment: parseFloat(record.avg_sentiment) || 0,
-          // Keep timestamp for tooltip
           timestamp: record.recorded_at,
         }));
 
-        setData(chartData);
+        // Sort data by timestamp (oldest → newest)
+        const sortedData = chartData.sort(
+          (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+        );
+
+        setData(sortedData);
       } catch (err) {
         console.error("Failed to load stock history:", err);
         setError(err.message);
@@ -69,6 +71,16 @@ export default function Chart() {
 
     loadStockHistory();
   }, [ticker, timeRange]);
+
+  // Calculate latest and average sentiment
+  const validSentimentData = data.filter(d => d.sentiment !== 0);
+  const latestSentiment =
+    validSentimentData[validSentimentData.length - 1]?.sentiment ?? 0;
+  const avgSentiment =
+    validSentimentData.length > 0
+      ? validSentimentData.reduce((sum, d) => sum + d.sentiment, 0) /
+        validSentimentData.length
+      : 0;
 
   return (
     <div className="chart-container">
@@ -255,15 +267,13 @@ export default function Chart() {
             <div className="stat-card">
               <span className="stat-label">Latest Sentiment</span>
               <span className="stat-value">
-                {data[data.length - 1]?.sentiment.toFixed(3)}
+                {latestSentiment.toFixed(3)}
               </span>
             </div>
             <div className="stat-card">
               <span className="stat-label">Avg Sentiment</span>
               <span className="stat-value">
-                {(
-                  data.reduce((sum, d) => sum + d.sentiment, 0) / data.length
-                ).toFixed(3)}
+                {avgSentiment.toFixed(3)}
               </span>
             </div>
           </div>
