@@ -158,59 +158,66 @@ def list_stocks(conn):
         return cursor.fetchall()
 
 def get_watchlist(conn, user_id):
+    """Get watchlist array from users table"""
     with conn.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT s.ticker
-            FROM watchlist w
-            JOIN stocks s ON w.stock_id = s.id
-            WHERE w.user_id = %s
-            ORDER BY s.ticker;
-            """,
-            (user_id,),
-        )
-        rows = cursor.fetchall()
-    return [r["ticker"] for r in rows]
-
-def ensure_stock(conn, ticker):
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT id FROM stocks WHERE ticker = %s;", (ticker,))
+        cursor.execute("SELECT watchlist FROM users WHERE id = %s;", (user_id,))
         row = cursor.fetchone()
-        if row:
-            return row["id"]
-        
-        cursor.execute("INSERT INTO stocks(ticker) VALUES (%s);", (ticker,))
-        conn.commit()
-        return cursor.lastrowid
+    if not row:
+        return []
+    watchlist = row.get("watchlist")
+    if isinstance(watchlist, str):
+        try:
+            return json.loads(watchlist)
+        except json.JSONDecodeError:
+            return []
+    return watchlist if isinstance(watchlist, list) else []
 
 def add_to_watchlist(conn, user_id, ticker):
-    stock_id = ensure_stock(conn, ticker)
+    """Add ticker to watchlist JSON array"""
+    ticker = ticker.strip().upper()
     with conn.cursor() as cursor:
-        cursor.execute(
-            "SELECT id FROM watchlist WHERE user_id = %s AND stock_id = %s;",
-            (user_id, stock_id),
-        )
-        row = cursor.fetchone()
-        if row:
-            return
-        cursor.execute(
-            "INSERT INTO watchlist(user_id, stock_id) VALUES (%s, %s);",
-            (user_id, stock_id),
-        )        
-    conn.commit()
-
-def remove_from_watchlist(conn, user_id, ticker):
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT id FROM stocks WHERE ticker = %s;", (ticker,))        
+        # Get current watchlist
+        cursor.execute("SELECT watchlist FROM users WHERE id = %s;", (user_id,))
         row = cursor.fetchone()
         if not row:
             return
-        stock_id = row["id"]
-        cursor.execute(
-            "DELETE FROM watchlist WHERE user_id = %s AND stock_id = %s;",
-            (user_id, stock_id),
-        )        
-    conn.commit()         
+        
+        watchlist = row.get("watchlist", "[]")
+        if isinstance(watchlist, str):
+            watchlist = json.loads(watchlist)
+        
+        # Add ticker if not already present
+        if ticker not in watchlist:
+            watchlist.append(ticker)
+            watchlist.sort()  # Keep alphabetical order
+            cursor.execute(
+                "UPDATE users SET watchlist = %s WHERE id = %s;",
+                (json.dumps(watchlist), user_id)
+            )
+            conn.commit()
+
+def remove_from_watchlist(conn, user_id, ticker):
+    """Remove ticker from watchlist JSON array"""
+    ticker = ticker.strip().upper()
+    with conn.cursor() as cursor:
+        # Get current watchlist
+        cursor.execute("SELECT watchlist FROM users WHERE id = %s;", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return
+        
+        watchlist = row.get("watchlist", "[]")
+        if isinstance(watchlist, str):
+            watchlist = json.loads(watchlist)
+        
+        # Remove ticker if present
+        if ticker in watchlist:
+            watchlist.remove(ticker)
+            cursor.execute(
+                "UPDATE users SET watchlist = %s WHERE id = %s;",
+                (json.dumps(watchlist), user_id)
+            )
+            conn.commit()         
        
 
 def _http_get_json(url):
@@ -466,7 +473,7 @@ def lambda_handler(event, context):
                 if not user_id or not ticker:
                     return _resp(400, {"error": "user_id and ticker are required"})
                 ticker = ticker.strip().upper()
-                add_to_watchlist(conn, int(user_id), ticker)
+                add_to_watchlist(conn, user_id, ticker)
                 return _resp(200, {"message": "added", "ticker": ticker})
             
             # DELETE /watchlist
@@ -476,7 +483,7 @@ def lambda_handler(event, context):
                 if not user_id or not ticker:
                     return _resp(400, {"error": "user_id and ticker are required"})
                 ticker = ticker.strip().upper()
-                remove_from_watchlist(conn, int(user_id), ticker)
+                remove_from_watchlist(conn, user_id, ticker)
                 return _resp(200, {"message": "removed", "ticker": ticker})
             
             return _resp(404, {"error": "not found", "path": path, "method": method})             
