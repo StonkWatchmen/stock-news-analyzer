@@ -22,6 +22,56 @@ except Exception as e:
     print(f"Warning: Could not initialize Comprehend client: {e}")
     comprehend = None
 
+def wait_for_database(max_retries=20, retry_delay=15):
+    """Wait for database to be initialized with schema"""
+    print("Waiting for database to be ready...")
+    print(f"Will retry up to {max_retries} times with {retry_delay}s delay between attempts")
+    
+    for attempt in range(max_retries):
+        try:
+            conn = pymysql.connect(
+                host=DB_HOST,
+                user=DB_USER,
+                password=DB_PASS,
+                database=DB_NAME,
+                connect_timeout=10,
+                cursorclass=pymysql.cursors.DictCursor
+            )
+            
+            # Check if stocks table exists
+            with conn.cursor() as cursor:
+                cursor.execute("SHOW TABLES LIKE 'stocks'")
+                result = cursor.fetchone()
+                
+                if result:
+                    print("✓ Database is ready with schema!")
+                    
+                    # Also check if there are any stocks
+                    cursor.execute("SELECT COUNT(*) as count FROM stocks")
+                    stock_count = cursor.fetchone()['count']
+                    print(f"✓ Found {stock_count} stocks in database")
+                    
+                    conn.close()
+                    return True
+                else:
+                    print(f"  Attempt {attempt + 1}/{max_retries}: 'stocks' table not found yet...")
+            
+            conn.close()
+            
+        except pymysql.err.OperationalError as e:
+            print(f"  Attempt {attempt + 1}/{max_retries}: Cannot connect to database - {e}")
+        except pymysql.err.InternalError as e:
+            print(f"  Attempt {attempt + 1}/{max_retries}: Database error - {e}")
+        except Exception as e:
+            print(f"  Attempt {attempt + 1}/{max_retries}: Unexpected error - {e}")
+        
+        if attempt < max_retries - 1:
+            print(f"  Waiting {retry_delay} seconds before retry...")
+            time.sleep(retry_delay)
+    
+    print("✗ Database did not become ready in time")
+    return False
+
 def get_db_connection():
     """Connect to RDS database"""
     return pymysql.connect(
@@ -312,32 +362,65 @@ def main():
     print("="*60)
     print("Stock News Analyzer - Historical Data Backfill")
     print("="*60)
+    print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Validate environment variables
     if not all([DB_HOST, DB_USER, DB_PASS, ALPHA_VANTAGE_KEY]):
-        print("ERROR: Missing required environment variables")
+        print("\n✗ ERROR: Missing required environment variables")
         print("Required: DB_HOST, DB_USER, DB_PASS, ALPHA_VANTAGE_KEY")
+        print(f"DB_HOST: {'SET' if DB_HOST else 'MISSING'}")
+        print(f"DB_USER: {'SET' if DB_USER else 'MISSING'}")
+        print(f"DB_PASS: {'SET' if DB_PASS else 'MISSING'}")
+        print(f"ALPHA_VANTAGE_KEY: {'SET' if ALPHA_VANTAGE_KEY else 'MISSING'}")
+        sys.exit(1)
+    
+    print(f"\n✓ Environment variables validated")
+    print(f"  DB_HOST: {DB_HOST}")
+    print(f"  DB_NAME: {DB_NAME}")
+    print(f"  AWS_REGION: {AWS_REGION}")
+    
+    # Wait for database to be initialized with schema
+    print("\n" + "="*60)
+    if not wait_for_database(max_retries=20, retry_delay=15):
+        print("✗ ERROR: Database schema not initialized in time")
+        print("The init_db_lambda may not have completed successfully")
         sys.exit(1)
     
     # Connect to database
+    print("\n" + "="*60)
     try:
         conn = get_db_connection()
         print(f"✓ Connected to database at {DB_HOST}")
     except Exception as e:
-        print(f"ERROR: Could not connect to database: {e}")
+        print(f"✗ ERROR: Could not connect to database: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
     
     # Get stocks to backfill
-    stocks = get_stocks(conn)
-    
-    if not stocks:
-        print("No stocks found in database. Please add stocks first.")
+    try:
+        stocks = get_stocks(conn)
+    except Exception as e:
+        print(f"✗ ERROR: Could not fetch stocks: {e}")
+        import traceback
+        traceback.print_exc()
+        conn.close()
         sys.exit(1)
     
-    print(f"\nFound {len(stocks)} stocks to backfill")
-    print(f"Stocks: {', '.join([s['ticker'] for s in stocks])}")
+    if not stocks:
+        print("\n⚠ WARNING: No stocks found in database")
+        print("Please add stocks to the 'stocks' table before running backfill")
+        conn.close()
+        sys.exit(0)
+    
+    print(f"\n✓ Found {len(stocks)} stocks to backfill")
+    print(f"  Stocks: {', '.join([s['ticker'] for s in stocks])}")
     
     # Backfill each stock
+    print("\n" + "="*60)
+    print("STARTING BACKFILL PROCESS")
+    print("="*60)
+    
     success_count = 0
     for i, stock in enumerate(stocks, 1):
         print(f"\n[{i}/{len(stocks)}] Starting {stock['ticker']}...")
@@ -361,9 +444,15 @@ def main():
     
     print("\n" + "="*60)
     print("BACKFILL COMPLETE")
-    print(f"Successfully backfilled {success_count}/{len(stocks)} stocks")
-    print(f"Time elapsed: {elapsed:.1f} seconds ({elapsed/60:.1f} minutes)")
     print("="*60)
+    print(f"✓ Successfully backfilled {success_count}/{len(stocks)} stocks")
+    print(f"⏱  Time elapsed: {elapsed:.1f} seconds ({elapsed/60:.1f} minutes)")
+    print(f"📅 End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*60)
+    
+    if success_count < len(stocks):
+        print(f"\n⚠ WARNING: {len(stocks) - success_count} stock(s) failed to backfill")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
