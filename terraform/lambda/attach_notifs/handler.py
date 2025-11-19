@@ -5,7 +5,8 @@ import os
 sns = boto3.client("sns")
 
 def handler(event, context):
-    email = event.get('message')
+    email = event.get('email')
+    id = event.get('id')
 
     if email is None:
         return
@@ -13,9 +14,14 @@ def handler(event, context):
     sns_arn = os.environ.get("NOTIFS_ARN")
 
     response = sns.subscribe(
-        TopicArn = sns_arn
-        Protocol = "email"
-        Endpoint = "email"
+        TopicArn = sns_arn,
+        Protocol = "email",
+        Endpoint = email,
+        Atrributes = {
+            "FilterPolicy": json.dumps({
+                "userId" : [f"{id}"]
+            })
+        }
     )
 
-    return event
+    return response
