@@ -317,7 +317,7 @@ def lambda_handler(event, context):
                 if not user_id:
                     return _resp(400, {"error": "user_id is required"})
                 tickers = get_watchlist(conn, user_id)
-                return _resp(200, {"user_id": int(user_id), "tickers": tickers})
+                return _resp(200, {"user_id": user_id, "tickers": tickers})
 
             # GET /quotes?tickers=AAPL,MSFT
             if path.endswith("/quotes") and method == "GET":
@@ -365,7 +365,7 @@ def lambda_handler(event, context):
                 if not user_id or not ticker:
                     return _resp(400, {"error": "user_id and ticker are required"})
                 ticker = ticker.strip().upper()
-                add_to_watchlist(conn, int(user_id), ticker)
+                add_to_watchlist(conn, user_id, ticker)
                 return _resp(200, {"message": "added", "ticker": ticker})
             
             # DELETE /watchlist
@@ -375,7 +375,7 @@ def lambda_handler(event, context):
                 if not user_id or not ticker:
                     return _resp(400, {"error": "user_id and ticker are required"})
                 ticker = ticker.strip().upper()
-                remove_from_watchlist(conn, int(user_id), ticker)
+                remove_from_watchlist(conn, user_id, ticker)
                 return _resp(200, {"message": "removed", "ticker": ticker})
             
             return _resp(404, {"error": "not found", "path": path, "method": method})             
