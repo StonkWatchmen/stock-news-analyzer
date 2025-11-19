@@ -1,59 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { CognitoUserPool } from "amazon-cognito-identity-js";
 import "./Watchlist.css";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL;
 
-const userPool = new CognitoUserPool({
-  UserPoolId: process.env.REACT_APP_COGNITO_USER_POOL_ID,
-  ClientId: process.env.REACT_APP_COGNITO_CLIENT_ID,
-});
-
-export default function Watchlist() {
+export default function Watchlist({ userId }) {
   const [allStocks, setAllStocks] = useState([]);
   const [watchlist, setWatchlist] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [userId, setUserId] = useState(null);
 
-  // Get current Cognito user and ID token
-  async function getCurrentUser() {
-    return new Promise((resolve, reject) => {
-      const currentUser = userPool.getCurrentUser();
-      if (!currentUser) return reject(new Error("No user logged in"));
-
-      currentUser.getSession((err, session) => {
-        if (err) return reject(err);
-
-        currentUser.getUserAttributes((err, attrs) => {
-          if (err) return reject(err);
-
-          const subAttr = attrs.find((a) => a.Name === "sub");
-          resolve({
-            token: session.getIdToken().getJwtToken(),
-            userId: subAttr?.Value,
-          });
-        });
-      });
-    });
-  }
-
-  // Fetch stocks and set userId
+  // Fetch all available stocks
   useEffect(() => {
     async function fetchStocks() {
       setLoading(true);
       setError(null);
       try {
-        const { token, userId: cognitoUserId } = await getCurrentUser();
-        if (!cognitoUserId) throw new Error("Failed to get user ID");
-
-        setUserId(cognitoUserId);
-
-        const res = await fetch(`${API_BASE}/stocks`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(`${API_BASE}/stocks`);
         if (!res.ok) throw new Error(`API error: ${res.status}`);
-
         const json = await res.json();
         setAllStocks(json.stocks || []);
       } catch (err) {
@@ -63,36 +26,33 @@ export default function Watchlist() {
         setLoading(false);
       }
     }
-
     fetchStocks();
   }, []);
 
-  // Load watchlist from backend
+  // Load user watchlist
   useEffect(() => {
     async function loadWatchlist() {
       if (!userId) return;
-
       try {
         const res = await fetch(`${API_BASE}/watchlist?user_id=${userId}`);
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         const json = await res.json();
-
+        // Map tickers to stock objects
         const watchlistStocks = allStocks.filter((stock) =>
           (json.tickers || []).includes(stock.ticker)
         );
         setWatchlist(watchlistStocks);
       } catch (err) {
         console.error("Failed to load watchlist:", err);
+        setError("Failed to load watchlist");
       }
     }
-
-    if (allStocks.length > 0 && userId) loadWatchlist();
+    if (allStocks.length > 0) loadWatchlist();
   }, [allStocks, userId]);
 
   // Add stock to watchlist
   async function addToWatchlist(stock) {
     if (!userId) return setError("User not logged in");
-
     if (watchlist.some((s) => s.ticker === stock.ticker)) return;
 
     try {
@@ -140,7 +100,7 @@ export default function Watchlist() {
             <ul>
               {allStocks.map((stock) => (
                 <li key={stock.id}>
-                  {stock.ticker} - {stock.name || stock.ticker}
+                  {stock.ticker}
                   <button
                     onClick={() => addToWatchlist(stock)}
                     disabled={watchlist.some((s) => s.ticker === stock.ticker)}
@@ -159,7 +119,7 @@ export default function Watchlist() {
             <ul>
               {watchlist.map((stock) => (
                 <li key={stock.id}>
-                  {stock.ticker} - {stock.name || stock.ticker}
+                  {stock.ticker}
                   <button onClick={() => removeFromWatchlist(stock)}>Remove</button>
                 </li>
               ))}
