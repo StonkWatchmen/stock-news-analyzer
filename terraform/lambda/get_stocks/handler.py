@@ -95,11 +95,13 @@ def add_to_watchlist(conn, user_id, ticker):
         cursor.execute("SELECT watchlist FROM users WHERE id = %s;", (user_id,))
         row = cursor.fetchone()
         if not row:
-            return
-        
-        watchlist = row.get("watchlist", "[]")
-        if isinstance(watchlist, str):
-            watchlist = json.loads(watchlist)
+            # Create user with empty watchlist if doesn't exist
+            cursor.execute("INSERT INTO users (id, watchlist) VALUES (%s, %s);", (user_id, '[]'))
+            watchlist = []
+        else:
+            watchlist = row.get("watchlist", "[]")
+            if isinstance(watchlist, str):
+                watchlist = json.loads(watchlist)
         
         # Add ticker if not already present
         if ticker not in watchlist:
@@ -119,6 +121,7 @@ def remove_from_watchlist(conn, user_id, ticker):
         cursor.execute("SELECT watchlist FROM users WHERE id = %s;", (user_id,))
         row = cursor.fetchone()
         if not row:
+            # User doesn't exist, nothing to remove
             return
         
         watchlist = row.get("watchlist", "[]")
@@ -325,7 +328,8 @@ def lambda_handler(event, context):
                 if not user_id:
                     return _resp(400, {"error": "user_id is required"})
                 tickers = get_watchlist(conn, user_id)
-                return _resp(200, {"user_id": user_id, "tickers": tickers})
+                # Return empty watchlist if user doesn't exist
+                return _resp(200, {"user_id": user_id, "tickers": tickers or []})
 
             # GET /quotes?tickers=AAPL,MSFT
             if path.endswith("/quotes") and method == "GET":
