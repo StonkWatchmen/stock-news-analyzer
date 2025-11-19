@@ -1,242 +1,93 @@
-import {useEffect, useState} from "react";
-import {getWatchlist, saveWatchlist } from "../utils/storage";
-import "./Watchlist.css"
+import React, { useEffect, useState } from "react";
+import "./Watchlist.css";
 
-const TICKER_REGEX = /^[A-Z.-]{1,10}$/;    // Allows ticker patterns like BRK.B, RDS.A, etc.
-// const API_BASE = process.env.REACT_APP_API_BASE;
 const API_BASE = process.env.REACT_APP_API_BASE_URL;
 
-const USER_ID = 1; // until Cognito is hooked up
-
-// Keep tickers consistent: trim whitespace and uppercase
-function normalizeTicker(t) {
-    return t.trim().toUpperCase();
-}
-
 export default function Watchlist() {
-    // Track ticker list, input value, and user error message. 
-    const [items, setItems] = useState([]);
-    const [input, setInput] = useState("");
-    const [error, setError] = useState("");
-    const [quotes, setQuotes] = useState([]);
-    const count = items.length;
-    const isDisabled = !input.trim();
+  const [allStocks, setAllStocks] = useState([]);
+  const [watchlist, setWatchlist] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-    // load from backend on mount
-    useEffect(() => {
-        const fetchWatchlist = async () => {
-            if (!API_BASE) {
-                const local = getWatchlist();
-                setItems(local);
-                await fetchQuotesFor(local);
-                return;
-            }
-            try {
-                const res = await fetch(`${API_BASE}/watchlist?user_id=${encodeURIComponent(USER_ID)}`);
-                if (!res.ok) {
-                    throw new Error("bad status");
-                }
-                const data = await res.json();
-                const tickers = data.tickers || [];
-                setItems(tickers);
-                saveWatchlist(tickers);
-                await fetchQuotesFor(tickers);
-            } catch (err) {
-                console.warn("Backend watchlist fetch failed, falling back to local:", err);
-                const local = getWatchlist();
-                setItems(local);
-                await fetchQuotesFor(local);
-            }
-        };
-        fetchWatchlist();    
-    }, []);
-
-    async function syncAdd(ticker) {
-        if (!API_BASE) {
-            return;
-        }
-        await fetch(`${API_BASE}/watchlist`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: USER_ID, ticker }),
-        }); 
+  // Fetch all available stocks from the backend
+  useEffect(() => {
+    async function fetchStocks() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_BASE}/stocks`);
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        const json = await res.json();
+        setAllStocks(json.stocks || []);
+      } catch (err) {
+        setError("Failed to load stock list");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     }
+    fetchStocks();
+  }, []);
 
-    async function syncRemove(ticker) {
-        if (!API_BASE) {
-            return;
-        }
-        await fetch(`${API_BASE}/watchlist`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: USER_ID, ticker }),
-        });
-    }     
-
-
-    // Fetch quotes for a list of tickers and update state
-    async function fetchQuotesFor(list) {
-        if(!list.length){
-            setQuotes([]);
-            return;
-        }
-        if(!API_BASE){
-            console.error("Missing REACT_APP_API_BASE. Prices cannnot be loaded");
-            return;
-        }
-        const qs = encodeURIComponent(list.join(","));
-        try {
-            const res = await fetch(`${API_BASE}/quotes?tickers=${qs}`);
-            if (!res.ok) throw new Error(`quotes ${res.status}`);
-            const data = await res.json();
-            setQuotes(data.quotes || []);
-        } catch (e) {
-            console.warn("Fetching quotes failed:", e);
-            setQuotes([]);
-        }
+  // Add stock to watchlist
+  function addToWatchlist(stock) {
+    if (!watchlist.some((s) => s.ticker === stock.ticker)) {
+      setWatchlist((prev) => [...prev, stock]);
     }
+  }
 
+  // Remove stock from watchlist
+  function removeFromWatchlist(stock) {
+    setWatchlist((prev) => prev.filter((s) => s.ticker !== stock.ticker));
+  }
 
+  return (
+    <div className="watchlist-container">
+      <h3 className="watchlist-title">Your Watchlist</h3>
 
+      {error && <div className="watchlist-error">{error}</div>}
+      {loading && <div className="watchlist-loading">Loading stocks...</div>}
 
-
-
-           
-    async function handleAdd(e) {
-        e.preventDefault();
-
-        // Validation chain -> normalize, check format, check duplicates, check limit
-        const symbol = normalizeTicker(input);
-        if (!symbol) {
-            setError("Enter a ticker symbol.");
-            return;
-        }
-        if (!TICKER_REGEX.test(symbol)) {
-            setError("Only letters, dots, or hyphens (max 10).");
-            return;
-        }
-        if (items.includes(symbol)) {
-            setError("That ticker is already in your watchlist.");
-            return;
-        }
-        if (items.length >= 50) {
-            setError("You've reached the 50 ticker limit.");
-            return;
-        }
-        
-        // Updates local state and localStorage
-        const next = [...items, symbol].sort();
-        setItems(next);
-        saveWatchlist(next);
-
-        // Reset form + clear errors
-        setInput("");
-        setError("");
-
-        // syncAdd(symbol).catch((err) => console.error(err));
-        try { await syncAdd(symbol); } catch (err) { console.error(err); }
-        await fetchQuotesFor(next);
-    }
-
-    // Remove single ticker
-    async function handleRemove(symbol) {
-        const next = items.filter((t) => t !== symbol);
-        setItems(next);
-        saveWatchlist(next);
-        // syncRemove(symbol).catch((err) => console.error(err));
-        try { await syncRemove(symbol); } catch (err) { console.error(err); }
-        await fetchQuotesFor(next);
-    }
-
-    // Clear all tickers (with confirmation)
-    function handleClearAll() {
-        if (!window.confirm("Clear all tickers from your watchlist?")) {
-            return;
-        }
-
-        // best effort clear on backend
-        items.forEach((t) => syncRemove(t).catch(() => {}));
-        setItems([]);
-        saveWatchlist([]);
-        setQuotes([]);
-    }
-
-    return (
-        <div className="watchlist-container">
-            <h1 className="watchlist-title">Your Watchlist</h1>
-
-            <form className="watchlist-form" onSubmit={handleAdd}>
-                <input 
-                    aria-label="Add ticker"
-                    className="watchlist-input"
-                    placeholder="e.g. AAPL"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    maxLength={12}    
-                />
-                <button className="watchlist-add" disabled={isDisabled} type="submit">
+      {!loading && !error && (
+        <div className="watchlist-content">
+          <div className="available-stocks">
+            <h4>Available Stocks</h4>
+            {allStocks.length === 0 && <p>No stocks available</p>}
+            <ul>
+              {allStocks.map((stock) => (
+                <li key={stock.id}>
+                  {stock.ticker} - {stock.name || stock.ticker}
+                  <button
+                    className="watchlist-add-btn"
+                    onClick={() => addToWatchlist(stock)}
+                    disabled={watchlist.some((s) => s.ticker === stock.ticker)}
+                  >
                     Add
-                </button>
-            </form>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-            {error ? <div className="watchlist-error">{error}</div> : null}
-
-            <div className="watchlist-meta">
-                <span>{count} {count === 1 ? "ticker" : "tickers"}</span>
-                {count > 0 && (
-                    <button className="watchlist-clear" onClick={handleClearAll}>
-                        Clear All
-                    </button>
-                )}
-            </div>
-
-            <ul className="watchlist-items">
-            {items.map((t) => {
-                const q = quotes.find((x) => x.ticker === t) || {};
-
-                const score =
-                    typeof q.sentiment_score === "number" ? q.sentiment_score : null;
-                const label = q.sentiment_label || null;      // "Bullish", "Bearish", etc.
-                const errorMsg = q.error;
-
-                const scoreDisplay = score !== null ? score.toFixed(3) : "—";
-
-                const sentimentLabel = label || (errorMsg ? "Error" : "—");
-
-                const sentimentClass =
-                    score > 0 ? "up" :
-                    score < 0 ? "down" :
-                    "";
-
-                return (
-                    <li key={t} className="watchlist-item">
-                        <span className="ticker">{t}</span>
-
-                        <div className="watchlist-values">
-                            {/* Sentiment numeric score */}
-                            <span className={`sentiment-score ${sentimentClass}`}>
-                                {scoreDisplay}
-                            </span>
-
-                            {/* Sentiment label */}
-                            <span className={`sentiment ${sentimentClass}`}>
-                                {sentimentLabel}
-                            </span>
-                        </div>
-
-                        <button
-                            className="remove-btn"
-                            onClick={() => handleRemove(t)}
-                            title="Remove this ticker"
-                        >
-                            x
-                        </button>
-                    </li>
-                );
-            })}
-
-            </ul> 
+          <div className="current-watchlist">
+            <h4>Current Watchlist</h4>
+            {watchlist.length === 0 && <p>No stocks in watchlist</p>}
+            <ul>
+              {watchlist.map((stock) => (
+                <li key={stock.id}>
+                  {stock.ticker} - {stock.name || stock.ticker}
+                  <button
+                    className="watchlist-remove-btn"
+                    onClick={() => removeFromWatchlist(stock)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 }
-

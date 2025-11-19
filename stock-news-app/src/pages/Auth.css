@@ -109,23 +109,6 @@
     transform: scale(1.02);
   }
   
-  .signout-container {
-    max-width: 200px;
-    margin: 100px auto;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 32px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    text-align: center;
-    transition: transform 0.2s ease, background 0.2s ease;
-  }
-  
-  .signout-container:hover {
-    background: var(--surface-hover);
-    transform: translateY(-2px);
-  }
-  
   .signout-btn {
     padding: 12px 20px;
     border-radius: 8px;
