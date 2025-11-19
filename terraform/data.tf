@@ -79,7 +79,8 @@ data "archive_file" "attach_notifs_zip" {
   type        = "zip"
   source_dir  = "${path.module}/build/attach_notifs"
   output_path = "${path.module}/attach_notifs.zip"
-  
+}
+
 # Create ZIP archive for scheduler Lambda
 data "archive_file" "scheduler_zip" {
   depends_on  = [null_resource.package_lambda_scheduler]
