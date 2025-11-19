@@ -66,7 +66,10 @@ resource "aws_db_instance" "stock_news_analyzer_db" {
   username               = var.db_username                                              # Database admin username
   password               = var.db_password                                              # Replace with a secure password
   parameter_group_name   = "default.mysql8.0"                                           # Default parameter group for MySQL 8.0
-  skip_final_snapshot    = true                                                         # Skip final snapshot when destroying the database
+  skip_final_snapshot    = true
+  deletion_protection    = false
+  delete_automated_backups = true
+  backup_retention_period = 0
   vpc_security_group_ids = [aws_security_group.rds_sg.id]                               # Attach the RDS security group
   db_subnet_group_name   = aws_db_subnet_group.stock_news_analyzer_db_subnet_group.name # Use the created subnet group
 }
@@ -103,7 +106,6 @@ resource "aws_instance" "db_init" {
     Name = "db-init"
   }
 }
-
 
 resource "aws_iam_role" "ec2_role" {
   name = "stock-news-analyzer-ec2-role"
