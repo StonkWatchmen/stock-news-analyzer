@@ -40,8 +40,8 @@ resource "aws_lambda_function" "send_notifs_lambda" {
   handler       = "handler.lambda_handler"
   runtime       = "python3.12"
   timeout = 15
-  filename         = data.archive_file.attach_notifs_zip.output_path
-  source_code_hash = data.archive_file.attach_notifs_zip.output_base64sha256
+  filename         = data.archive_file.send_notifs_zip.output_path
+  source_code_hash = data.archive_file.send_notifs_zip.output_base64sha256
 
   environment {
     variables = {
