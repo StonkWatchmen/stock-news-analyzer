@@ -120,7 +120,7 @@ function Dashboard() {
                     onClick={() => !isInWatchlist && handleAddToWatchlist(stock.ticker)}
                     disabled={isInWatchlist}
                   >
-                    {isInWatchlist ? '✓ In Watchlist' : '+ Add to Watchlist'}
+                    {isInWatchlist ? 'In Watchlist' : '+ Add to Watchlist'}
                   </button>
                 </div>
               );

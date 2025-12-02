@@ -6,15 +6,8 @@
     max-width: 1200px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 8px;
     padding: 24px 28px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s ease, background 0.2s ease;
-  }
-  
-  .chart-container:hover {
-    background: var(--surface-hover);
-    transform: translateY(-2px);
   }
   
   /* ========================================
@@ -35,7 +28,6 @@
     font-weight: 600;
     letter-spacing: 0.3px;
     color: var(--accent);
-    text-shadow: 0 0 12px rgba(0, 196, 107, 0.3);
   }
   
   /* ========================================
@@ -64,26 +56,22 @@
   .select-input {
     padding: 10px 16px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 6px;
     background: var(--surface-hover);
     color: var(--text);
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
     min-width: 140px;
   }
   
   .select-input:hover {
     border-color: var(--accent);
-    background: var(--surface);
-    box-shadow: 0 2px 8px rgba(0, 196, 107, 0.15);
   }
   
   .select-input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(0, 196, 107, 0.2);
   }
   
   /* ========================================
@@ -116,7 +104,7 @@
     padding: 16px 20px;
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 8px;
+    border-radius: 6px;
     color: #ef4444;
     text-align: center;
     font-size: 14px;
@@ -156,7 +144,7 @@
     color: var(--muted);
     font-size: 16px;
     background: var(--surface-hover);
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px dashed var(--border);
   }
   
@@ -175,18 +163,11 @@
   .stat-card {
     background: var(--surface-hover);
     padding: 18px 20px;
-    border-radius: 10px;
+    border-radius: 6px;
     display: flex;
     flex-direction: column;
     gap: 8px;
     border: 1px solid var(--border);
-    transition: all 0.2s ease;
-  }
-  
-  .stat-card:hover {
-    border-color: var(--accent);
-    box-shadow: 0 4px 12px rgba(0, 196, 107, 0.15);
-    transform: translateY(-2px);
   }
   
   .stat-label {
@@ -201,7 +182,6 @@
     font-size: 22px;
     font-weight: 700;
     color: var(--accent);
-    text-shadow: 0 0 8px rgba(0, 196, 107, 0.2);
   }
   
   /* ========================================
@@ -281,8 +261,7 @@
   .recharts-default-tooltip {
     background: var(--surface-hover) !important;
     border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    border-radius: 6px !important;
   }
   
   .recharts-tooltip-label {
@@ -301,10 +280,6 @@
      Dark Mode Enhancements
      ======================================== */
   @media (prefers-color-scheme: dark) {
-    .chart-container {
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-    }
-  
     .select-input {
       background: rgba(255, 255, 255, 0.05);
     }
@@ -317,10 +292,6 @@
       background: rgba(255, 255, 255, 0.03);
       border-color: rgba(255, 255, 255, 0.1);
     }
-  
-    .stat-card:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
   }
   
   /* ========================================
@@ -332,12 +303,6 @@
   }
   
   @media (prefers-reduced-motion: reduce) {
-    .chart-container,
-    .stat-card,
-    .select-input {
-      transition: none;
-    }
-  
     .chart-loading::before {
       animation: none;
     }
