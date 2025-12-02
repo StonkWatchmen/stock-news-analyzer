@@ -18,6 +18,29 @@ export default function Chart() {
   const [timeRange, setTimeRange] = useState("7d");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [availableStocks, setAvailableStocks] = useState([]);
+
+  // Fetch available stocks on mount
+  useEffect(() => {
+    async function fetchStocks() {
+      if (!API_BASE) return;
+      try {
+        const res = await fetch(`${API_BASE}/stocks`);
+        if (res.ok) {
+          const data = await res.json();
+          const stocks = data.stocks || [];
+          setAvailableStocks(stocks);
+          // Set default ticker to first stock if available
+          if (stocks.length > 0 && !stocks.find(s => s.ticker === ticker)) {
+            setTicker(stocks[0].ticker);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch stocks:", err);
+      }
+    }
+    fetchStocks();
+  }, []);
 
   useEffect(() => {
     async function loadStockHistory() {
@@ -97,13 +120,15 @@ export default function Chart() {
               onChange={(e) => setTicker(e.target.value)}
               className="select-input"
             >
-              <option value="AAPL">Apple (AAPL)</option>
-              <option value="NFLX">Netflix (NFLX)</option>
-              <option value="AMZN">Amazon (AMZN)</option>
-              <option value="NVDA">NVIDIA (NVDA)</option>
-              <option value="META">Meta (META)</option>
-              <option value="MSFT">Microsoft (MSFT)</option>
-              <option value="AMD">AMD (AMD)</option>
+              {availableStocks.length > 0 ? (
+                availableStocks.map((stock) => (
+                  <option key={stock.id} value={stock.ticker}>
+                    {stock.ticker}
+                  </option>
+                ))
+              ) : (
+                <option value="AAPL">Apple (AAPL)</option>
+              )}
             </select>
           </div>
 

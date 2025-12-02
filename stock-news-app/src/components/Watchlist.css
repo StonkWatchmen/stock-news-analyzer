@@ -199,3 +199,13 @@ color: #16a34a;       /* green */
 .pct.down {
 color: #dc2626;       /* red */
 }
+
+.watchlist-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 20px;
+  font-size: 15px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  margin: 16px 0;
+}
