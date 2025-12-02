@@ -77,3 +77,20 @@
   text-align: center;
   padding: 20px;
 }
+
+.stocks-error {
+  color: var(--danger);
+  text-align: center;
+  padding: 20px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: rgba(248, 81, 73, 0.1);
+}
+
+.stocks-empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 20px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}

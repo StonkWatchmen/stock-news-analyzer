@@ -74,6 +74,18 @@
     text-align: center;
   }
   
+  .auth-message-success {
+    color: var(--accent);
+    background: rgba(0, 196, 107, 0.1);
+    border: 1px solid var(--accent);
+  }
+
+  .auth-message-error {
+    color: var(--danger);
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid var(--danger);
+  }
+  
   .auth-link-text {
     text-align: center;
     color: var(--muted);

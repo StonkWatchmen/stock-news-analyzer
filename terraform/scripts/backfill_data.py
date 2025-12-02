@@ -349,7 +349,7 @@ def backfill_stock(conn, stock_id, ticker, months=12):
             UPDATE stock_history
             SET avg_sentiment = %s
             WHERE stock_id = %s 
-            AND DATE(recorded_at) = %s
+            AND DATE(recorded_at) = DATE(%s)
         """, sentiment_updates)
     conn.commit()
     print(f"  ✓ Updated sentiment for {len(sentiment_updates)} days")

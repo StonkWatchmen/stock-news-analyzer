@@ -5,9 +5,8 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS stocks;
 
 CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
-    email VARCHAR(64) NOT NULL,
-    password VARCHAR(64) NOT NULL
+    id VARCHAR(255) PRIMARY KEY NOT NULL,  -- Changed to VARCHAR to store Cognito sub (UUID)
+    email VARCHAR(64) NOT NULL UNIQUE      -- Added UNIQUE constraint
 );
 
 CREATE TABLE stocks (
@@ -17,7 +16,7 @@ CREATE TABLE stocks (
 
 CREATE TABLE watchlist (
     id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
-    user_id INTEGER NOT NULL,
+    user_id VARCHAR(255) NOT NULL,  -- Changed to VARCHAR to match users.id
     stock_id INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (stock_id) REFERENCES stocks(id),

@@ -11,22 +11,32 @@ function Dashboard() {
   const [availableStocks, setAvailableStocks] = useState([]);
   const [watchlistTickers, setWatchlistTickers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stocksError, setStocksError] = useState(null);
 
   // Fetch available stocks
   useEffect(() => {
     async function fetchStocks() {
       if (!API_BASE) {
         setLoading(false);
+        setStocksError("API_BASE_URL not configured");
         return;
       }
       try {
         const res = await fetch(`${API_BASE}/stocks`);
-        if (res.ok) {
-          const data = await res.json();
-          setAvailableStocks(data.stocks || []);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch stocks: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        const stocks = data.stocks || [];
+        setAvailableStocks(stocks);
+        if (stocks.length === 0) {
+          setStocksError("No stocks found in database");
+        } else {
+          setStocksError(null);
         }
       } catch (err) {
         console.error("Failed to fetch stocks:", err);
+        setStocksError(err.message || "Failed to load stocks");
       } finally {
         setLoading(false);
       }
@@ -87,6 +97,17 @@ function Dashboard() {
         <h3 className="available-stocks-title">Available Stocks</h3>
         {loading ? (
           <div className="loading-text">Loading stocks...</div>
+        ) : stocksError ? (
+          <div className="stocks-error">
+            <p>Error: {stocksError}</p>
+            <p style={{ fontSize: '14px', color: 'var(--muted)', marginTop: '8px' }}>
+              Make sure the database has been initialized with stocks. Check the browser console for more details.
+            </p>
+          </div>
+        ) : availableStocks.length === 0 ? (
+          <div className="stocks-empty">
+            No stocks available. Please ensure stocks have been seeded in the database.
+          </div>
         ) : (
           <div className="stocks-grid">
             {availableStocks.map((stock) => {
