@@ -240,20 +240,6 @@ resource "aws_iam_instance_profile" "backfill_profile" {
 }
 
 # Prepare user data script
-data "template_file" "backfill_user_data" {
-  template = file("${path.module}/scripts/user_data.sh")
-
-  vars = {
-    BACKFILL_SCRIPT_CONTENT = file("${path.module}/scripts/backfill_data.py")
-    DB_HOST                 = aws_db_instance.stock_news_analyzer_db.address
-    DB_USER                 = var.db_username
-    DB_PASS                 = var.db_password
-    DB_NAME                 = "stocknewsanalyzerdb"
-    ALPHA_VANTAGE_KEY       = var.alpha_vantage_key
-    AWS_REGION              = var.aws_region
-  }
-}
-
 resource "aws_instance" "backfill_instance" {
   ami                    = data.aws_ami.amazonlinux.id
   instance_type          = "t3.micro"  # Enough for the task
@@ -261,7 +247,15 @@ resource "aws_instance" "backfill_instance" {
   vpc_security_group_ids = [aws_security_group.backfill_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.backfill_profile.name
 
-  user_data = data.template_file.backfill_user_data.rendered
+  user_data = templatefile("${path.module}/scripts/user_data.sh", {
+    BACKFILL_SCRIPT_CONTENT = file("${path.module}/scripts/backfill_data.py")
+    DB_HOST                 = aws_db_instance.stock_news_analyzer_db.address
+    DB_USER                 = var.db_username
+    DB_PASS                 = var.db_password
+    DB_NAME                 = "stocknewsanalyzerdb"
+    ALPHA_VANTAGE_KEY       = var.alpha_vantage_key
+    AWS_REGION              = var.aws_region
+  })
 
   tags = {
     Name = "stock-news-analyzer-backfill"
