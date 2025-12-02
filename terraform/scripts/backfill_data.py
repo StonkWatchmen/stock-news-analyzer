@@ -186,7 +186,7 @@ def fetch_time_series_daily(ticker):
         'function': 'TIME_SERIES_DAILY',
         'symbol': ticker,
         'apikey': ALPHA_VANTAGE_KEY,
-        'outputsize': 'full'  # Last 100 days
+        'outputsize': 'full'
     }
     
     try:
@@ -195,10 +195,22 @@ def fetch_time_series_daily(ticker):
         response.raise_for_status()
         data = response.json()
         
+        # Check for API errors
+        if 'Error Message' in data:
+            print(f"  ✗ Alpha Vantage Error: {data['Error Message']}")
+            return None
+        
+        if 'Note' in data:
+            print(f"  ⚠ Alpha Vantage Note: {data['Note']}")
+            # Rate limit - wait longer
+            if 'rate limit' in data['Note'].lower() or 'call frequency' in data['Note'].lower():
+                print(f"  ⚠ Rate limited - waiting 60 seconds...")
+                time.sleep(60)
+                return None
+        
         if 'Time Series (Daily)' not in data:
             print(f"  ⚠ No time series data for {ticker}")
-            if 'Note' in data:
-                print(f"  API Note: {data['Note']}")
+            print(f"  Response keys: {list(data.keys())}")
             return None
         
         return data['Time Series (Daily)']
@@ -523,9 +535,11 @@ def main():
             traceback.print_exc()
             continue
         
-        # Small delay between stocks (API rate limit)
+        # Rate limit: Alpha Vantage free tier allows 5 calls per minute
+        # Wait 15 seconds between stocks to avoid rate limits
         if i < len(stocks):
-            time.sleep(1)
+            print(f"  Waiting 15 seconds to avoid rate limits...")
+            time.sleep(15)
     
     conn.close()
     

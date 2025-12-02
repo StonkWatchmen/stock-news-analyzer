@@ -140,18 +140,31 @@ def ensure_stock(conn, ticker):
         return cursor.lastrowid
 
 def add_to_watchlist(conn, user_id, ticker):
+    # Convert user_id to string if it's an integer (for backward compatibility)
+    user_id_str = str(user_id)
+    
+    # Ensure user exists in database (create if doesn't exist for demo purposes)
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT id FROM users WHERE id = %s;", (user_id_str,))
+        user = cursor.fetchone()
+        if not user:
+            # Create a temporary user for demo (in production, this should come from Cognito)
+            cursor.execute("INSERT IGNORE INTO users (id, email) VALUES (%s, %s);", 
+                         (user_id_str, f"demo-user-{user_id_str}@example.com"))
+            conn.commit()
+    
     stock_id = ensure_stock(conn, ticker)
     with conn.cursor() as cursor:
         cursor.execute(
             "SELECT id FROM watchlist WHERE user_id = %s AND stock_id = %s;",
-            (user_id, stock_id),
+            (user_id_str, stock_id),
         )
         row = cursor.fetchone()
         if row:
             return
         cursor.execute(
             "INSERT INTO watchlist(user_id, stock_id) VALUES (%s, %s);",
-            (user_id, stock_id),
+            (user_id_str, stock_id),
         )        
     conn.commit()
 
@@ -422,7 +435,8 @@ def lambda_handler(event, context):
                 if not user_id or not ticker:
                     return _resp(400, {"error": "user_id and ticker are required"})
                 ticker = ticker.strip().upper()
-                add_to_watchlist(conn, int(user_id), ticker)
+                # Convert user_id to string
+                add_to_watchlist(conn, str(user_id), ticker)
                 return _resp(200, {"message": "added", "ticker": ticker})
             
             # DELETE /watchlist
