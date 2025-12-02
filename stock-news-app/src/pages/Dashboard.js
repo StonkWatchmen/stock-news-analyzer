@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Watchlist from "../components/Watchlist";
 import Chart from "../components/Chart";
 import SignOut from "./SignOut";
@@ -49,6 +49,11 @@ function Dashboard() {
       }
     }
     fetchWatchlist();
+  }, []);
+
+  // Stable callback for watchlist changes
+  const handleWatchlistChange = useCallback((tickers) => {
+    setWatchlistTickers(tickers);
   }, []);
 
   // Add stock to watchlist
@@ -105,7 +110,7 @@ function Dashboard() {
 
       <div>
         <Chart />
-        <Watchlist onWatchlistChange={setWatchlistTickers} />
+        <Watchlist onWatchlistChange={handleWatchlistChange} />
       </div>
     </div>    
   );

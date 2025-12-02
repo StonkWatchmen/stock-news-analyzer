@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useEffect, useState, useCallback} from "react";
 import {getWatchlist, saveWatchlist } from "../utils/storage";
 import "./Watchlist.css"
 
@@ -12,6 +12,28 @@ export default function Watchlist({ onWatchlistChange }) {
     const [items, setItems] = useState([]);
     const [quotes, setQuotes] = useState([]);
     const count = items.length;
+
+    // Fetch quotes for a list of tickers and update state
+    const fetchQuotesFor = useCallback(async (list) => {
+        if(!list.length){
+            setQuotes([]);
+            return;
+        }
+        if(!API_BASE){
+            console.error("Missing REACT_APP_API_BASE. Prices cannnot be loaded");
+            return;
+        }
+        const qs = encodeURIComponent(list.join(","));
+        try {
+            const res = await fetch(`${API_BASE}/quotes?tickers=${qs}`);
+            if (!res.ok) throw new Error(`quotes ${res.status}`);
+            const data = await res.json();
+            setQuotes(data.quotes || []);
+        } catch (e) {
+            console.warn("Fetching quotes failed:", e);
+            setQuotes([]);
+        }
+    }, []);
 
     // load from backend on mount
     useEffect(() => {
@@ -50,7 +72,7 @@ export default function Watchlist({ onWatchlistChange }) {
         };
         window.addEventListener('watchlist-updated', handleUpdate);
         return () => window.removeEventListener('watchlist-updated', handleUpdate);
-    }, [onWatchlistChange]);
+    }, [fetchQuotesFor, onWatchlistChange]);
 
     async function syncRemove(ticker) {
         if (!API_BASE) {
@@ -62,28 +84,6 @@ export default function Watchlist({ onWatchlistChange }) {
             body: JSON.stringify({ user_id: USER_ID, ticker }),
         });
     }     
-
-    // Fetch quotes for a list of tickers and update state
-    async function fetchQuotesFor(list) {
-        if(!list.length){
-            setQuotes([]);
-            return;
-        }
-        if(!API_BASE){
-            console.error("Missing REACT_APP_API_BASE. Prices cannnot be loaded");
-            return;
-        }
-        const qs = encodeURIComponent(list.join(","));
-        try {
-            const res = await fetch(`${API_BASE}/quotes?tickers=${qs}`);
-            if (!res.ok) throw new Error(`quotes ${res.status}`);
-            const data = await res.json();
-            setQuotes(data.quotes || []);
-        } catch (e) {
-            console.warn("Fetching quotes failed:", e);
-            setQuotes([]);
-        }
-    }
 
     // Remove single ticker
     async function handleRemove(symbol) {

@@ -30,10 +30,6 @@ export default function Chart() {
           const data = await res.json();
           const stocks = data.stocks || [];
           setAvailableStocks(stocks);
-          // Set default ticker to first stock if available
-          if (stocks.length > 0 && !stocks.find(s => s.ticker === ticker)) {
-            setTicker(stocks[0].ticker);
-          }
         }
       } catch (err) {
         console.error("Failed to fetch stocks:", err);
@@ -41,6 +37,13 @@ export default function Chart() {
     }
     fetchStocks();
   }, []);
+
+  // Set default ticker when stocks are loaded
+  useEffect(() => {
+    if (availableStocks.length > 0 && !availableStocks.find(s => s.ticker === ticker)) {
+      setTicker(availableStocks[0].ticker);
+    }
+  }, [availableStocks, ticker]);
 
   useEffect(() => {
     async function loadStockHistory() {
