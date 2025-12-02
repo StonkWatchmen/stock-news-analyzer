@@ -389,6 +389,8 @@ def lambda_handler(event, context):
                     "count": len(history)
                 })
 
+          # Replace your /quotes endpoint handler with this:
+
             # GET /quotes?tickers=AAPL,MSFT
             if path.endswith("/quotes") and method == "GET":
                 qs = event.get("queryStringParameters") or {}
@@ -403,21 +405,60 @@ def lambda_handler(event, context):
                         {"error": "tickers query param required, e.g. ?tickers=AAPL,MSFT"},
                     )
 
-                # Only fetch sentiment – no DB reads/writes, no `prices` table
-                sentiments = _fetch_news_sentiment_for_tickers(tickers)
-                sentiments_map = {s["ticker"]: s for s in sentiments}
-
                 quotes = []
-                for ticker in tickers:
-                    s = sentiments_map.get(ticker, {}) or {}
-                    quotes.append({
-                        "ticker": ticker,
-                        "price": None,
-                        "change_pct": None,
-                        "sentiment_score": s.get("sentiment_score"),
-                        "sentiment_label": s.get("sentiment_label"),
-                        "error": s.get("error"),
-                    })
+                
+                with conn.cursor() as cursor:
+                    for ticker in tickers:
+                        # Get the latest sentiment from stock_history
+                        cursor.execute("""
+                            SELECT 
+                                s.ticker,
+                                sh.price,
+                                sh.avg_sentiment,
+                                sh.recorded_at
+                            FROM stocks s
+                            LEFT JOIN stock_history sh ON sh.stock_id = s.id
+                            WHERE s.ticker = %s
+                            ORDER BY sh.recorded_at DESC
+                            LIMIT 1
+                        """, (ticker,))
+                        
+                        row = cursor.fetchone()
+                        
+                        if row and row['avg_sentiment'] is not None:
+                            sentiment_score = float(row['avg_sentiment'])
+                            
+                            # Generate sentiment label based on score
+                            if sentiment_score >= 0.35:
+                                sentiment_label = "Bullish"
+                            elif sentiment_score >= 0.15:
+                                sentiment_label = "Somewhat-Bullish"
+                            elif sentiment_score > -0.15:
+                                sentiment_label = "Neutral"
+                            elif sentiment_score > -0.35:
+                                sentiment_label = "Somewhat-Bearish"
+                            else:
+                                sentiment_label = "Bearish"
+                            
+                            quotes.append({
+                                "ticker": ticker,
+                                "price": float(row['price']) if row['price'] else None,
+                                "change_pct": None,  # Not tracking this in current schema
+                                "sentiment_score": sentiment_score,
+                                "sentiment_label": sentiment_label,
+                                "error": None,
+                                "updated_at": row['recorded_at'].isoformat() if row['recorded_at'] else None
+                            })
+                        else:
+                            # No data found in database
+                            quotes.append({
+                                "ticker": ticker,
+                                "price": None,
+                                "change_pct": None,
+                                "sentiment_score": None,
+                                "sentiment_label": "No Data",
+                                "error": "No historical data available",
+                            })
 
                 return _resp(200, {"quotes": quotes})
             # body for POST/DELETE
