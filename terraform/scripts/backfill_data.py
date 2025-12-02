@@ -349,7 +349,82 @@ def backfill_stock(conn, stock_id, ticker, months=12):
         print(f"  ✗ Skipping {ticker} - no price data")
         return False
     
-    # Store prices
+    # 2. Fetch and process news FIRST
+    articles = fetch_news(ticker)
+    print(f"  ✓ Found {len(articles)} articles")
+    
+    # Process articles and build daily sentiment map
+    daily_sentiments = {}  # date -> avg sentiment
+    
+    if articles:
+        article_texts = []
+        article_data = []
+        
+        for article in articles:
+            title = article.get('title', '')
+            summary = article.get('summary', '')
+            time_published = article.get('time_published', '')
+            
+            if not title or not time_published:
+                continue
+            
+            try:
+                published_dt = datetime.strptime(time_published, '%Y%m%dT%H%M%S')
+            except ValueError:
+                continue
+            
+            text = f"{title}. {summary}"
+            article_texts.append(text)
+            article_data.append({
+                'title': title[:500],
+                'published_dt': published_dt,
+                'published_date': published_dt.date()
+            })
+        
+        if article_texts:
+            print(f"  Processing {len(article_texts)} articles with Comprehend...")
+            
+            # Batch process sentiment and keywords
+            sentiments = batch_analyze_sentiment(article_texts)
+            keywords_list = batch_extract_keywords(article_texts)
+            
+            # Store articles and calculate daily averages
+            articles_to_store = []
+            daily_sentiment_lists = {}  # date -> list of scores
+            
+            for i, data in enumerate(article_data):
+                sentiment = sentiments[i]
+                keywords = keywords_list[i]
+                
+                articles_to_store.append((
+                    stock_id,
+                    data['title'],
+                    keywords,
+                    sentiment,
+                    data['published_dt']
+                ))
+                
+                # Track for daily average
+                date = data['published_date']
+                if date not in daily_sentiment_lists:
+                    daily_sentiment_lists[date] = []
+                daily_sentiment_lists[date].append(sentiment)
+            
+            # Calculate daily averages
+            for date, sentiment_list in daily_sentiment_lists.items():
+                daily_sentiments[date] = sum(sentiment_list) / len(sentiment_list)
+            
+            # Bulk insert articles
+            with conn.cursor() as cursor:
+                cursor.executemany("""
+                    INSERT INTO article_history (stock_id, title, keywords, sentiment_score, recorded_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, articles_to_store)
+            conn.commit()
+            print(f"  ✓ Stored {len(articles_to_store)} articles")
+            print(f"  ✓ Calculated sentiment for {len(daily_sentiments)} unique days")
+    
+    # 3. Now insert prices WITH sentiment where available
     prices_to_store = []
     for date_str, daily_data in time_series.items():
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
@@ -358,111 +433,27 @@ def backfill_stock(conn, stock_id, ticker, months=12):
             continue
         
         close_price = float(daily_data.get('4. close', 0))
-        prices_to_store.append((stock_id, close_price, date_obj))
+        
+        # Get sentiment for this date if available, otherwise 0
+        avg_sentiment = daily_sentiments.get(date_obj.date(), 0.0)
+        
+        prices_to_store.append((stock_id, close_price, avg_sentiment, date_obj))
     
-    # Bulk insert prices
+    # Bulk insert prices with sentiment already calculated
     with conn.cursor() as cursor:
         cursor.executemany("""
             INSERT INTO stock_history (stock_id, price, avg_sentiment, recorded_at)
-            VALUES (%s, %s, NULL, %s)
+            VALUES (%s, %s, %s, %s)
         """, prices_to_store)
     conn.commit()
-    print(f"  ✓ Stored {len(prices_to_store)} price records")
     
-    # Rate limit between API calls
-    time.sleep(1)
+    # Count how many had real sentiment vs default 0
+    sentiment_days = len(daily_sentiments)
+    total_days = len(prices_to_store)
     
-    # 2. Fetch and process news
-    articles = fetch_news(ticker)
-    print(f"  ✓ Found {len(articles)} articles")
-    
-    if not articles:
-        print(f"  ⚠ No articles to process")
-        return True
-    
-    # Prepare article data for batch processing
-    article_texts = []
-    article_data = []
-    
-    for article in articles:
-        title = article.get('title', '')
-        summary = article.get('summary', '')
-        time_published = article.get('time_published', '')
-        
-        if not title or not time_published:
-            continue
-        
-        try:
-            published_dt = datetime.strptime(time_published, '%Y%m%dT%H%M%S')
-        except ValueError:
-            continue
-        
-        text = f"{title}. {summary}"
-        article_texts.append(text)
-        article_data.append({
-            'title': title[:500],
-            'published_dt': published_dt,
-            'published_date': published_dt.date()
-        })
-    
-    if not article_texts:
-        print(f"  ⚠ No valid articles to process")
-        return True
-    
-    print(f"  Processing {len(article_texts)} articles with Comprehend...")
-    
-    # Batch process sentiment and keywords
-    sentiments = batch_analyze_sentiment(article_texts)
-    keywords_list = batch_extract_keywords(article_texts)
-    
-    # Store articles and track daily sentiments
-    daily_sentiments = {}  # date -> list of sentiment scores
-    articles_to_store = []
-    
-    for i, data in enumerate(article_data):
-        sentiment = sentiments[i]
-        keywords = keywords_list[i]
-        
-        articles_to_store.append((
-            stock_id,
-            data['title'],
-            keywords,
-            sentiment,
-            data['published_dt']
-        ))
-        
-        # Track for daily average
-        date = data['published_date']
-        if date not in daily_sentiments:
-            daily_sentiments[date] = []
-        daily_sentiments[date].append(sentiment)
-    
-    # Bulk insert articles
-    with conn.cursor() as cursor:
-        cursor.executemany("""
-            INSERT INTO article_history (stock_id, title, keywords, sentiment_score, recorded_at)
-            VALUES (%s, %s, %s, %s, %s)
-        """, articles_to_store)
-    conn.commit()
-    print(f"  ✓ Stored {len(articles_to_store)} articles")
-    
-    # Update stock_history with average daily sentiment
-    sentiment_updates = []
-    for date, sentiments in daily_sentiments.items():
-        avg_sentiment = sum(sentiments) / len(sentiments)
-        # Convert date to string format for reliable MySQL comparison
-        date_str = date.strftime('%Y-%m-%d')
-        sentiment_updates.append((avg_sentiment, stock_id, date_str))
-    
-    with conn.cursor() as cursor:
-        cursor.executemany("""
-            UPDATE stock_history
-            SET avg_sentiment = %s
-            WHERE stock_id = %s 
-            AND DATE(recorded_at) = DATE(%s)
-        """, sentiment_updates)
-    conn.commit()
-    print(f"  ✓ Updated sentiment for {len(sentiment_updates)} days")
+    print(f"  ✓ Stored {total_days} price records")
+    print(f"  ✓ {sentiment_days} days have article sentiment ({sentiment_days/total_days*100:.1f}%)")
+    print(f"  ✓ {total_days - sentiment_days} days default to 0 (no articles)")
     
     print(f"  ✓ Completed {ticker}")
     return True
