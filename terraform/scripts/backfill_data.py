@@ -340,7 +340,9 @@ def backfill_stock(conn, stock_id, ticker, months=12):
     sentiment_updates = []
     for date, sentiments in daily_sentiments.items():
         avg_sentiment = sum(sentiments) / len(sentiments)
-        sentiment_updates.append((avg_sentiment, stock_id, date))
+        # Convert date to string format for reliable MySQL comparison
+        date_str = date.strftime('%Y-%m-%d')
+        sentiment_updates.append((avg_sentiment, stock_id, date_str))
     
     with conn.cursor() as cursor:
         cursor.executemany("""
