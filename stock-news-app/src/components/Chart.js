@@ -102,11 +102,6 @@ export default function Chart() {
   const validSentimentData = data.filter(d => d.sentiment !== 0);
   const latestSentiment =
     validSentimentData[validSentimentData.length - 1]?.sentiment ?? 0;
-  const avgSentiment =
-    validSentimentData.length > 0
-      ? validSentimentData.reduce((sum, d) => sum + d.sentiment, 0) /
-        validSentimentData.length
-      : 0;
 
   return (
     <div className="chart-container">
@@ -296,12 +291,6 @@ export default function Chart() {
               <span className="stat-label">Latest Sentiment</span>
               <span className="stat-value">
                 {latestSentiment.toFixed(3)}
-              </span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-label">Avg Sentiment</span>
-              <span className="stat-value">
-                {avgSentiment.toFixed(3)}
               </span>
             </div>
           </div>
