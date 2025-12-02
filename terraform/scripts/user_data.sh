@@ -10,17 +10,16 @@ echo "Starting backfill EC2 instance setup..."
 # Update system
 yum update -y
 
-# Install Python 3 and pip
-yum install -y python3 python3-pip git
+# Install Python 3, pip, and AWS CLI
+yum install -y python3 python3-pip git aws-cli
 
 # Create working directory
 mkdir -p /home/ec2-user/backfill
 cd /home/ec2-user/backfill
 
-# Download the backfill script (you'll need to host this somewhere or inline it)
-cat > backfill_data.py << 'BACKFILL_SCRIPT'
-${BACKFILL_SCRIPT_CONTENT}
-BACKFILL_SCRIPT
+# Download the backfill script from S3
+echo "Downloading backfill script from S3..."
+aws s3 cp s3://${SCRIPT_BUCKET}/backfill_data.py ./backfill_data.py
 
 cat > requirements.txt << 'REQUIREMENTS'
 pymysql

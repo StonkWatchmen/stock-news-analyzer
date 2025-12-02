@@ -51,7 +51,10 @@ resource "aws_s3_bucket_policy" "react_bucket_policy" {
   bucket = aws_s3_bucket.react_bucket.id
 
   policy     = data.aws_iam_policy_document.get_object_iam_policy.json
-  depends_on = [aws_s3_bucket_public_access_block.react_bucket_public_access_block]
+  depends_on = [
+    aws_s3_bucket_public_access_block.react_bucket_public_access_block,
+    aws_s3_bucket.react_bucket  # Add explicit dependency
+  ]
 }
 
 # RDS Instance
@@ -239,28 +242,67 @@ resource "aws_iam_instance_profile" "backfill_profile" {
   role = aws_iam_role.backfill_role.name
 }
 
+# Add this near your other S3 resources
+resource "aws_s3_bucket" "scripts_bucket" {
+  bucket = "stock-news-analyzer-scripts-${var.environment}"
+}
+
+resource "aws_s3_bucket_versioning" "scripts_bucket_versioning" {
+  bucket = aws_s3_bucket.scripts_bucket.id
+  versioning_configuration {
+    status = "Disabled"
+  }
+}
+
+resource "aws_s3_object" "backfill_script" {
+  bucket = aws_s3_bucket.scripts_bucket.id
+  key    = "backfill_data.py"
+  source = "${path.module}/scripts/backfill_data.py"
+  etag   = filemd5("${path.module}/scripts/backfill_data.py")
+}
+
 # Prepare user data script
 resource "aws_instance" "backfill_instance" {
   ami                    = data.aws_ami.amazonlinux.id
-  instance_type          = "t3.micro"  # Enough for the task
-  subnet_id              = aws_subnet.public_subnet.id  # Needs internet access
+  instance_type          = "t3.micro"
+  subnet_id              = aws_subnet.public_subnet.id
   vpc_security_group_ids = [aws_security_group.backfill_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.backfill_profile.name
 
-  user_data = templatefile("${path.module}/scripts/user_data.sh", {
-    BACKFILL_SCRIPT_CONTENT = file("${path.module}/scripts/backfill_data.py")
-    DB_HOST                 = aws_db_instance.stock_news_analyzer_db.address
-    DB_USER                 = var.db_username
-    DB_PASS                 = var.db_password
-    DB_NAME                 = "stocknewsanalyzerdb"
-    ALPHA_VANTAGE_KEY       = var.alpha_vantage_key
-    AWS_REGION              = var.aws_region
-  })
+  user_data = base64encode(templatefile("${path.module}/scripts/user_data.sh", {
+    DB_HOST           = aws_db_instance.stock_news_analyzer_db.address
+    DB_USER           = var.db_username
+    DB_PASS           = var.db_password
+    DB_NAME           = "stocknewsanalyzerdb"
+    ALPHA_VANTAGE_KEY = var.alpha_vantage_key
+    AWS_REGION        = var.aws_region
+    SCRIPT_BUCKET     = aws_s3_bucket.scripts_bucket.id
+  }))
 
   tags = {
     Name = "stock-news-analyzer-backfill"
   }
 
-  # Terminate instance after it completes (optional)
   instance_initiated_shutdown_behavior = "terminate"
+  
+  depends_on = [aws_s3_object.backfill_script]
+}
+
+# Find your backfill IAM role policy and ensure it includes:
+resource "aws_iam_role_policy" "backfill_s3_access" {
+  name = "backfill-s3-access"
+  role = aws_iam_role.backfill_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = "${aws_s3_bucket.scripts_bucket.arn}/*"
+      }
+    ]
+  })
 }
