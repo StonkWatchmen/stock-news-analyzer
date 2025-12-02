@@ -72,6 +72,92 @@ def wait_for_database(max_retries=20, retry_delay=15):
     print("✗ Database did not become ready in time")
     return False
 
+DEFAULT_TICKERS = ["AAPL", "NFLX", "AMZN", "NVDA", "META", "MSFT", "AMD"]
+
+SCHEMA_SQL = [
+    """
+    CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY NOT NULL,
+        email VARCHAR(64) NOT NULL UNIQUE
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS stocks (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+        ticker VARCHAR(10) NOT NULL UNIQUE
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS watchlist (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+        user_id VARCHAR(255) NOT NULL,
+        stock_id INT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (stock_id) REFERENCES stocks(id),
+        UNIQUE KEY unique_user_stock (user_id, stock_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS article_history (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+        stock_id INT NOT NULL,
+        title VARCHAR(500) NOT NULL,
+        keywords TEXT,
+        sentiment_score DECIMAL(10, 6),
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (stock_id) REFERENCES stocks(id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS stock_history (
+        id INT AUTO_INCREMENT PRIMARY KEY NOT NULL,
+        stock_id INT NOT NULL,
+        price DECIMAL(10, 2),
+        avg_sentiment DECIMAL(10, 6),
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (stock_id) REFERENCES stocks(id)
+    )
+    """
+]
+
+
+def ensure_schema(conn):
+    """Create tables if they do not exist."""
+    with conn.cursor() as cursor:
+        for statement in SCHEMA_SQL:
+            cursor.execute(statement)
+    conn.commit()
+    print("✓ Database schema ensured")
+
+
+def ensure_seed_stocks(conn):
+    """Insert default tickers if the stocks table is empty."""
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) as count FROM stocks")
+        count = cursor.fetchone()["count"]
+        if count == 0:
+            print("Seeding default tickers...")
+            cursor.executemany(
+                "INSERT INTO stocks (ticker) VALUES (%s)",
+                [(ticker,) for ticker in DEFAULT_TICKERS]
+            )
+            conn.commit()
+            print(f"✓ Inserted {len(DEFAULT_TICKERS)} default tickers")
+        else:
+            print(f"✓ Stocks table already has {count} ticker(s)")
+
+
+def wait_for_stocks(conn, retries=10, delay=15):
+    """Wait until at least one stock exists before backfilling."""
+    for attempt in range(retries):
+        stocks = get_stocks(conn)
+        if stocks:
+            return stocks
+        print(f"  Attempt {attempt + 1}/{retries}: no stocks yet, waiting {delay}s...")
+        time.sleep(delay)
+
+    raise RuntimeError("No stocks found after waiting; aborting backfill.")
+
 def get_db_connection():
     """Connect to RDS database"""
     return pymysql.connect(
@@ -399,13 +485,14 @@ def main():
         traceback.print_exc()
         sys.exit(1)
     
-    # Get stocks to backfill
+    # Ensure schema + seed data before running backfill
+    ensure_schema(conn)
+    ensure_seed_stocks(conn)
+
     try:
-        stocks = get_stocks(conn)
-    except Exception as e:
-        print(f"✗ ERROR: Could not fetch stocks: {e}")
-        import traceback
-        traceback.print_exc()
+        stocks = wait_for_stocks(conn, retries=12, delay=10)
+    except RuntimeError as e:
+        print(f"\n✗ ERROR: {e}")
         conn.close()
         sys.exit(1)
     
