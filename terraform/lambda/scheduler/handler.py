@@ -2,20 +2,23 @@ import os
 import json
 import pymysql
 import urllib.request, urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 import boto3
 import time
+import requests
 
 # AWS Clients
 comprehend = boto3.client('comprehend', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
 
-# Environment variables
-DB_HOST = os.environ['DB_HOST']
-DB_USER = os.environ['DB_USER']
-DB_PASS = os.environ['DB_PASS']
-DB_NAME = os.environ['DB_NAME']
-ALPHA_VANTAGE_KEY = os.environ.get('ALPHA_VANTAGE_KEY')
+# Configuration from environment variables
+DB_HOST = os.environ.get('DB_HOST')
+DB_USER = os.environ.get('DB_USER')
+DB_PASS = os.environ.get('DB_PASS')
+DB_NAME = os.environ.get('DB_NAME', 'stocknewsanalyzerdb')
+TIINGO_API_KEY = os.environ.get('TIINGO_API_KEY')
+ALPHA_VANTAGE_KEY = os.environ.get('ALPHA_VANTAGE_KEY')  # Keep for news
+AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
 
 def get_db_connection():
     return pymysql.connect(
@@ -37,24 +40,28 @@ def get_all_stocks(conn):
         return cursor.fetchall()
 
 def fetch_stock_price(ticker):
-    """Fetch current stock price from Alpha Vantage"""
-    if not ALPHA_VANTAGE_KEY:
+    """Fetch current stock price from Tiingo"""
+    if not TIINGO_API_KEY:
         return None
     
-    base_url = "https://www.alphavantage.co/query"
-    params = {
-        "function": "GLOBAL_QUOTE",
-        "symbol": ticker,
-        "apikey": ALPHA_VANTAGE_KEY
+    url = f'https://api.tiingo.com/tiingo/daily/{ticker}/prices'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Token {TIINGO_API_KEY}'
     }
     
     try:
-        data = _http_get_json(f"{base_url}?{urllib.parse.urlencode(params)}")
-        quote = data.get("Global Quote", {})
+        # Get latest price
+        response = urllib.request.urlopen(
+            urllib.request.Request(url, headers=headers),
+            timeout=10
+        )
+        data = json.loads(response.read().decode("utf-8"))
         
-        if quote:
-            price = float(Decimal(quote.get("05. price", "0")))
-            return price
+        if data and len(data) > 0:
+            # Get the most recent price
+            latest = data[-1]
+            return float(latest.get('close', 0))
         return None
     
     except Exception as e:

@@ -37,6 +37,7 @@ resource "aws_lambda_function" "scheduler_lambda" {
       DB_USER           = var.db_username
       DB_PASS           = var.db_password
       DB_NAME           = "stocknewsanalyzerdb"
+      TIINGO_API_KEY    = var.tiingo_api_key
       ALPHA_VANTAGE_KEY = var.alpha_vantage_key
     }
   }

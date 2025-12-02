@@ -11,7 +11,8 @@ DB_HOST = os.environ.get('DB_HOST')
 DB_USER = os.environ.get('DB_USER')
 DB_PASS = os.environ.get('DB_PASS')
 DB_NAME = os.environ.get('DB_NAME', 'stocknewsanalyzerdb')
-ALPHA_VANTAGE_KEY = os.environ.get('ALPHA_VANTAGE_KEY')
+TIINGO_API_KEY = os.environ.get('TIINGO_API_KEY')
+ALPHA_VANTAGE_KEY = os.environ.get('ALPHA_VANTAGE_KEY')  # Keep for news
 AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
 
 # Boto3 for Comprehend
@@ -176,45 +177,56 @@ def get_stocks(conn):
         return cursor.fetchall()
 
 def fetch_time_series_daily(ticker):
-    """Fetch daily time series data from Alpha Vantage"""
-    if not ALPHA_VANTAGE_KEY:
-        print("ERROR: ALPHA_VANTAGE_KEY not set")
+    """Fetch daily time series data from Tiingo"""
+    if not TIINGO_API_KEY:
+        print("ERROR: TIINGO_API_KEY not set")
         return None
     
-    url = 'https://www.alphavantage.co/query'
+    url = f'https://api.tiingo.com/tiingo/daily/{ticker}/prices'
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Token {TIINGO_API_KEY}'
+    }
+    
+    # Get last 3 months of data
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=90)
+    
     params = {
-        'function': 'TIME_SERIES_DAILY',
-        'symbol': ticker,
-        'apikey': ALPHA_VANTAGE_KEY,
-        'outputsize': 'full'
+        'startDate': start_date.strftime('%Y-%m-%d'),
+        'endDate': end_date.strftime('%Y-%m-%d'),
+        'format': 'json'
     }
     
     try:
-        print(f"  Fetching price data for {ticker}...")
-        response = requests.get(url, params=params, timeout=30)
+        print(f"  Fetching price data for {ticker} from Tiingo...")
+        response = requests.get(url, headers=headers, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
         
-        # Check for API errors
-        if 'Error Message' in data:
-            print(f"  ✗ Alpha Vantage Error: {data['Error Message']}")
-            return None
-        
-        if 'Note' in data:
-            print(f"  ⚠ Alpha Vantage Note: {data['Note']}")
-            # Rate limit - wait longer
-            if 'rate limit' in data['Note'].lower() or 'call frequency' in data['Note'].lower():
-                print(f"  ⚠ Rate limited - waiting 60 seconds...")
-                time.sleep(60)
-                return None
-        
-        if 'Time Series (Daily)' not in data:
+        if not data or len(data) == 0:
             print(f"  ⚠ No time series data for {ticker}")
-            print(f"  Response keys: {list(data.keys())}")
             return None
         
-        return data['Time Series (Daily)']
-    
+        # Convert Tiingo format to Alpha Vantage-like format for compatibility
+        time_series = {}
+        for record in data:
+            date_str = record['date'][:10]  # Extract date from ISO datetime (YYYY-MM-DD)
+            time_series[date_str] = {
+                '4. close': record['close']
+            }
+        
+        print(f"  ✓ Retrieved {len(time_series)} days of price data")
+        return time_series
+        
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            print(f"  ⚠ Ticker {ticker} not found in Tiingo")
+        elif e.response.status_code == 401:
+            print(f"  ✗ Tiingo API authentication failed - check API key")
+        else:
+            print(f"  ✗ Tiingo HTTP error: {e.response.status_code} - {e.response.text}")
+        return None
     except Exception as e:
         print(f"  ✗ Error fetching time series for {ticker}: {e}")
         return None
@@ -465,13 +477,13 @@ def main():
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Validate environment variables
-    if not all([DB_HOST, DB_USER, DB_PASS, ALPHA_VANTAGE_KEY]):
+    if not all([DB_HOST, DB_USER, DB_PASS, TIINGO_API_KEY]):
         print("\n✗ ERROR: Missing required environment variables")
-        print("Required: DB_HOST, DB_USER, DB_PASS, ALPHA_VANTAGE_KEY")
+        print("Required: DB_HOST, DB_USER, DB_PASS, TIINGO_API_KEY")
         print(f"DB_HOST: {'SET' if DB_HOST else 'MISSING'}")
         print(f"DB_USER: {'SET' if DB_USER else 'MISSING'}")
         print(f"DB_PASS: {'SET' if DB_PASS else 'MISSING'}")
-        print(f"ALPHA_VANTAGE_KEY: {'SET' if ALPHA_VANTAGE_KEY else 'MISSING'}")
+        print(f"TIINGO_API_KEY: {'SET' if TIINGO_API_KEY else 'MISSING'}")
         sys.exit(1)
     
     print(f"\n✓ Environment variables validated")

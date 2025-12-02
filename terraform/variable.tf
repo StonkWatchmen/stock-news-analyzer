@@ -17,10 +17,16 @@ variable "environment" {
   type        = string
 }
 
+variable "tiingo_api_key" {
+  type        = string
+  sensitive   = true
+  description = "Tiingo API key for stock price data"
+}
+
 variable "alpha_vantage_key" {
   type        = string
   sensitive   = true
-  description = "Alpha Vantage API key"
+  description = "Alpha Vantage API key (for news sentiment)"
 }
 
 

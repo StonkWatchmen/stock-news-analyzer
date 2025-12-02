@@ -274,7 +274,8 @@ resource "aws_instance" "backfill_instance" {
     DB_USER           = var.db_username
     DB_PASS           = var.db_password
     DB_NAME           = "stocknewsanalyzerdb"
-    ALPHA_VANTAGE_KEY = var.alpha_vantage_key
+    TIINGO_API_KEY    = var.tiingo_api_key
+    ALPHA_VANTAGE_KEY = var.alpha_vantage_key  # Keep for news
     AWS_REGION        = var.aws_region
     SCRIPT_BUCKET     = aws_s3_bucket.scripts_bucket.id
   }))
