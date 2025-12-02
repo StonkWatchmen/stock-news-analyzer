@@ -12,9 +12,6 @@ function Dashboard() {
   const [watchlistTickers, setWatchlistTickers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stocksError, setStocksError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState(null);
-  const [selectedTicker, setSelectedTicker] = useState("AAPL");
 
   // Fetch available stocks
   useEffect(() => {
@@ -36,10 +33,6 @@ function Dashboard() {
           setStocksError("No stocks found in database");
         } else {
           setStocksError(null);
-          // Set first stock as default
-          if (stocks.length > 0) {
-            setSelectedTicker(stocks[0].ticker);
-          }
         }
       } catch (err) {
         console.error("Failed to fetch stocks:", err);
@@ -84,81 +77,11 @@ function Dashboard() {
       });
       if (res.ok) {
         setWatchlistTickers([...watchlistTickers, ticker].sort());
+        // Trigger watchlist refresh by updating a key or using a callback
         window.dispatchEvent(new Event('watchlist-updated'));
       }
     } catch (err) {
       console.error("Failed to add to watchlist:", err);
-    }
-  }
-
-  // Handle chart ticker change
-  const handleChartTickerChange = useCallback((ticker) => {
-    setSelectedTicker(ticker);
-  }, []);
-
-  // Refresh data (simulate sentiment update and send email)
-  async function handleRefreshData() {
-    if (refreshing) return;
-    
-    setRefreshing(true);
-    setRefreshMessage(null);
-
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    try {
-      // Generate fake sentiment change
-      const sentimentChange = (Math.random() - 0.5) * 0.1; // -0.05 to +0.05
-      
-      // Calculate number of "articles"
-      const numArticles = Math.floor(Math.random() * 8) + 3; // 3-10 articles
-
-      const sentimentDirection = sentimentChange > 0.02 ? 'improved' : sentimentChange < -0.02 ? 'declined' : 'remained stable';
-
-      // Trigger chart refresh (chart will generate its own fake data)
-      window.dispatchEvent(new CustomEvent('data-refreshed', { 
-        detail: { ticker: selectedTicker, sentimentChange }
-      }));
-
-      // Send email notification via SNS
-      if (API_BASE) {
-        try {
-          const emailRes = await fetch(`${API_BASE}/send-notification`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_id: USER_ID,
-              ticker: selectedTicker,
-              sentiment_change: sentimentChange,
-              articles_count: numArticles,
-              watchlist: watchlistTickers
-            }),
-          });
-
-          if (emailRes.ok) {
-            console.log("Email notification sent successfully");
-          }
-        } catch (emailErr) {
-          console.error("Failed to send email:", emailErr);
-          // Don't fail the whole operation if email fails
-        }
-      }
-
-      setRefreshMessage({
-        type: "success",
-        text: `Data refreshed! Analyzed ${numArticles} articles for ${selectedTicker}. Sentiment ${sentimentDirection} (${sentimentChange > 0 ? '+' : ''}${sentimentChange.toFixed(3)}). Email notification sent.`
-      });
-
-    } catch (err) {
-      console.error("Failed to refresh data:", err);
-      setRefreshMessage({
-        type: "error",
-        text: `Error: ${err.message}`
-      });
-    } finally {
-      setRefreshing(false);
-      // Clear message after 5 seconds
-      setTimeout(() => setRefreshMessage(null), 5000);
     }
   }
 
@@ -169,28 +92,6 @@ function Dashboard() {
         <SignOut />
       </div>
       
-      {/* Refresh Section */}
-      <div className="refresh-section">
-        <div className="refresh-info">
-          <p className="refresh-description">
-            Collect latest sentiment data for <strong>{selectedTicker}</strong>
-          </p>
-        </div>
-        <button 
-          className="refresh-btn"
-          onClick={handleRefreshData}
-          disabled={refreshing || !selectedTicker}
-        >
-          {refreshing ? "Analyzing..." : "Refresh Sentiment"}
-        </button>
-      </div>
-
-      {refreshMessage && (
-        <div className={`refresh-message refresh-message-${refreshMessage.type}`}>
-          {refreshMessage.text}
-        </div>
-      )}
-
       {/* Available Stocks Section */}
       <div className="available-stocks-section">
         <h3 className="available-stocks-title">Available Stocks</h3>
@@ -229,7 +130,7 @@ function Dashboard() {
       </div>
 
       <div>
-        <Chart onTickerChange={handleChartTickerChange} />
+        <Chart />
         <Watchlist onWatchlistChange={handleWatchlistChange} />
       </div>
     </div>    
