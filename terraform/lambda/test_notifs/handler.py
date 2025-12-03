@@ -18,7 +18,7 @@ def get_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
-def handler(event, context):
+def lambda_handler(event, context):
     dev_email = os.environ.get("DEV_EMAIL")
 
     conn = get_connection()
