@@ -38,31 +38,56 @@ export default function ApiGatewayCaller() {
     };
 
     return (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
             <button
                 onClick={callApi}
                 disabled={loading}
+                style={{
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--accent)',
+                    background: loading ? 'var(--surface-hover)' : 'var(--accent)',
+                    color: '#fff',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.7 : 1,
+                    transition: 'all 0.2s'
+                }}
             >
-                Send Notification
+                {loading ? 'Sending...' : 'Send Notification'}
             </button>
 
             {response && (
-                <div>
-                    <h2>
-                        Response:
-                    </h2>
-                    <pre>
+                <div style={{
+                    padding: '12px',
+                    background: 'var(--surface-hover)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    maxWidth: '300px',
+                    wordBreak: 'break-word'
+                }}>
+                    <strong>Response:</strong>
+                    <pre style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--muted)' }}>
                         {JSON.stringify(response, null, 2)}
                     </pre>
                 </div>
             )}
 
             {error && (
-                <div>
-                    <h2>
-                        Error:
-                    </h2>
-                    <p>{error}</p>
+                <div style={{
+                    padding: '12px',
+                    background: 'rgba(248, 81, 73, 0.1)',
+                    border: '1px solid var(--danger)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: 'var(--danger)',
+                    maxWidth: '300px',
+                    wordBreak: 'break-word'
+                }}>
+                    <strong>Error:</strong>
+                    <p style={{ margin: '8px 0 0 0' }}>{error}</p>
                 </div>
             )}
         </div>
