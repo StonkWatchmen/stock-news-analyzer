@@ -115,14 +115,14 @@ resource "aws_api_gateway_method" "quotes_options" {
 # ========================================
 resource "aws_api_gateway_method" "post_notify" {
   rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id   = aws_api_gateway_resource.quotes.id
+  resource_id   = aws_api_gateway_resource.notify.id
   http_method   = "POST"
   authorization = "NONE"
 }
 
 resource "aws_api_gateway_method" "notify_options" {
   rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
-  resource_id   = aws_api_gateway_resource.quotes.id
+  resource_id   = aws_api_gateway_resource.notify.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
