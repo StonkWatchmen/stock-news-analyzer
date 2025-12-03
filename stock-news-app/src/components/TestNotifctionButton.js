@@ -39,49 +39,40 @@ export default function ApiGatewayCaller() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-            <div className="max-w-2xl mx-auto">
-                <div className="bg-white rounded-lg shadow-lg p-8">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-6">
-                        AWS API Gateway Caller
-                    </h1>
+        <div>
+            <button
+                onClick={callApi}
+                disabled={loading}
+            >
+                {loading ? (
+                    <>
+                        <Loader2 className="animate-spin" size={20} />
+                        Calling API...
+                    </>
+                ) : (
+                    'Call API Endpoint'
+                )}
+            </button>
 
-                    <button
-                        onClick={callApi}
-                        disabled={loading}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                    >
-                        {loading ? (
-                            <>
-                                <Loader2 className="animate-spin" size={20} />
-                                Calling API...
-                            </>
-                        ) : (
-                            'Call API Endpoint'
-                        )}
-                    </button>
-
-                    {response && (
-                        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                            <h2 className="text-lg font-semibold text-green-800 mb-2">
-                                Response:
-                            </h2>
-                            <pre className="text-sm text-gray-700 overflow-auto">
-                                {JSON.stringify(response, null, 2)}
-                            </pre>
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                            <h2 className="text-lg font-semibold text-red-800 mb-2">
-                                Error:
-                            </h2>
-                            <p className="text-sm text-red-700">{error}</p>
-                        </div>
-                    )}
+            {response && (
+                <div>
+                    <h2>
+                        Response:
+                    </h2>
+                    <pre>
+                        {JSON.stringify(response, null, 2)}
+                    </pre>
                 </div>
-            </div>
+            )}
+
+            {error && (
+                <div>
+                    <h2>
+                        Error:
+                    </h2>
+                    <p>{error}</p>
+                </div>
+            )}
         </div>
     );
 }

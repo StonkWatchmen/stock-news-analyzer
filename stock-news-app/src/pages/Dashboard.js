@@ -90,6 +90,7 @@ function Dashboard() {
       <div className="dashboard-bar">
         <h2>Your Dashboard</h2>
         <SignOut />
+        <TestNotificationButton />
       </div>
       
       {/* Available Stocks Section */}
