@@ -1,5 +1,5 @@
 resource "aws_ses_email_identity" "dev_email" {
-  email = "aguo1223@gmail.com"
+  email = "adventurelieu@gmail.com"
 }
 
 resource "aws_iam_role_policy" "lambda_ses_send" {
