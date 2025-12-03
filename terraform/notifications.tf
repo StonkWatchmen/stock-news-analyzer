@@ -3,7 +3,7 @@ resource "aws_ses_email_identity" "dev_email" {
 }
 
 resource "aws_iam_role_policy" "lambda_ses_send" {
-  role = aws_iam_role.lambda_exec_role.id
+  role = aws_iam_role.lambda_role.arn
 
   policy = jsonencode({
     Version = "2012-10-17"
