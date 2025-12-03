@@ -81,3 +81,10 @@ data "archive_file" "scheduler_zip" {
   source_dir  = "${path.module}/build/scheduler"
   output_path = "${path.module}/scheduler.zip"
 }
+
+data "archive_file" "test_notifs_zip" {
+  depends_on = [null_resource.package_lambda_send_notifs]
+  type        = "zip"
+  source_dir  = "${path.module}/build/test_notifs"
+  output_path = "${path.module}/test_notifs.zip"
+}
