@@ -19,33 +19,50 @@ def get_connection():
     )
 
 def lambda_handler(event, context):
-    dev_email = os.environ.get("DEV_EMAIL")
+    # CORS headers for all responses
+    cors_headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "POST,OPTIONS"
+    }
+    
+    try:
+        dev_email = os.environ.get("DEV_EMAIL")
 
-    conn = get_connection()
+        conn = get_connection()
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT id,email FROM users;")
-        all_user_info = cur.fetchall()
+        with conn.cursor() as cur:
+            cur.execute("SELECT id,email FROM users;")
+            all_user_info = cur.fetchall()
 
-        for user in all_user_info:
-            email = user["email"]
+            for user in all_user_info:
+                email = user["email"]
 
-            message_text = (
-                f"Hello {email},\n\n"
-                "Here is your personalized notification.\n"
-            )
+                message_text = (
+                    f"Hello {email},\n\n"
+                    "Here is your personalized notification.\n"
+                )
 
-            ses.send_email(
-                Source=dev_email,
-                Destination={"ToAddresses": [email]},
-                Message={
-                    "Subject": {"Data": f"Your personalized stock updates"},
-                    "Body": {"Text": {"Data": message_text}}
-                }
-            )
+                ses.send_email(
+                    Source=dev_email,
+                    Destination={"ToAddresses": [email]},
+                    Message={
+                        "Subject": {"Data": f"Your personalized stock updates"},
+                        "Body": {"Text": {"Data": message_text}}
+                    }
+                )
 
-    return {
+        return {
             "isBase64Encoded": False,
             "statusCode": 200,
-            "body": '{"status":"success"}'
-            }
+            "headers": cors_headers,
+            "body": json.dumps({"status": "success"})
+        }
+    except Exception as e:
+        # Return error response with CORS headers
+        return {
+            "isBase64Encoded": False,
+            "statusCode": 500,
+            "headers": cors_headers,
+            "body": json.dumps({"status": "error", "message": str(e)})
+        }

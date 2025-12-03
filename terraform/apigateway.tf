@@ -402,7 +402,7 @@ resource "aws_api_gateway_integration_response" "watchlist_options" {
 }
 
 # ========================================
-# CORS Method Responses - /quotes
+# CORS Method Responses - /notify
 # ========================================
 resource "aws_api_gateway_method_response" "notify_options_200" {
   rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
@@ -414,6 +414,33 @@ resource "aws_api_gateway_method_response" "notify_options_200" {
     "method.response.header.Access-Control-Allow-Headers" = true
     "method.response.header.Access-Control-Allow-Methods" = true
     "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+# Method response for POST /notify to allow CORS headers
+resource "aws_api_gateway_method_response" "post_notify_200" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.notify.id
+  http_method = aws_api_gateway_method.post_notify.http_method
+  status_code = "200"
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+  }
+}
+
+resource "aws_api_gateway_method_response" "post_notify_500" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.notify.id
+  http_method = aws_api_gateway_method.post_notify.http_method
+  status_code = "500"
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
   }
 }
 
@@ -499,6 +526,8 @@ resource "aws_api_gateway_deployment" "api_deployment" {
       aws_api_gateway_method.quotes_options.id,
       aws_api_gateway_method.stock_history_options.id,  # ADD THIS
       aws_api_gateway_method.notify_options.id,
+      aws_api_gateway_method_response.post_notify_200.id,
+      aws_api_gateway_method_response.post_notify_500.id,
       aws_api_gateway_integration.get_stocks_lambda_integration.id,
       aws_api_gateway_integration.get_watchlist_lambda_integration.id,
       aws_api_gateway_integration.post_watchlist_lambda_integration.id,
@@ -536,6 +565,8 @@ resource "aws_api_gateway_deployment" "api_deployment" {
     aws_api_gateway_integration_response.quotes_options,
     aws_api_gateway_integration_response.stock_history_options,  # ADD THIS
     aws_api_gateway_integration_response.notify_options,
+    aws_api_gateway_method_response.post_notify_200,
+    aws_api_gateway_method_response.post_notify_500,
   ]
 }
 
