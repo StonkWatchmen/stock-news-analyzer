@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
 
 export default function ApiGatewayCaller() {
     const [loading, setLoading] = useState(false);
@@ -44,14 +43,7 @@ export default function ApiGatewayCaller() {
                 onClick={callApi}
                 disabled={loading}
             >
-                {loading ? (
-                    <>
-                        <Loader2 className="animate-spin" size={20} />
-                        Calling API...
-                    </>
-                ) : (
-                    'Call API Endpoint'
-                )}
+                Send Notification
             </button>
 
             {response && (
