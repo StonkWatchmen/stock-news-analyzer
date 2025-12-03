@@ -491,12 +491,20 @@ resource "aws_api_gateway_integration_response" "quotes_options" {
 }
 
 # ========================================
-# Lambda Permission
+# Lambda Permissions
 # ========================================
 resource "aws_lambda_permission" "apigw_invoke" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.get_stocks_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.stock-news-analyzer-api.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "apigw_invoke_test_notifs" {
+  statement_id  = "AllowAPIGatewayInvokeTestNotifs"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.test_notifs_lambda.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.stock-news-analyzer-api.execution_arn}/*/*"
 }
