@@ -35,7 +35,7 @@ def lambda_handler(event, context):
                 "Here is your personalized notification.\n"
             )
 
-            response = ses.send_email(
+            ses.send_email(
                 Source=dev_email,
                 Destination={"ToAddresses": [email]},
                 Message={
@@ -44,5 +44,8 @@ def lambda_handler(event, context):
                 }
             )
 
-
-    return response
+    return {
+            "isBase64Encoded": False,
+            "statusCode": 200,
+            "body": '{"status":"success"}'
+            }
