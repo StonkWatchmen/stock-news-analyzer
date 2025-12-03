@@ -38,6 +38,9 @@ def lambda_handler(event, context):
             for user in all_user_info:
                 email = user["email"]
 
+                if email.lower() == "demo-user-1@example.com":
+                    continue
+
                 message_text = (
                     f"Hello {email},\n\n"
                     "Here is your personalized notification.\n"
