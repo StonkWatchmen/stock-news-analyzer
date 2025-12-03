@@ -36,7 +36,7 @@ resource "aws_lambda_function" "test_notifs_lambda" {
       DB_PASS           = var.db_password
       DB_NAME           = "stocknewsanalyzerdb"
 
-      DEV_EMAIL        = aws_sns_topic.notifications.arn
+      DEV_EMAIL        = aws_ses_email_identity.dev_email.email
     }
   }
 
