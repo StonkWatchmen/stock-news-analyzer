@@ -27,6 +27,12 @@ resource "aws_api_gateway_resource" "quotes" {
   path_part   = "quotes"
 }
 
+resource "aws_api_gateway_resource" "notify" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  parent_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.root_resource_id
+  path_part   = "notify"
+}
+
 # ========================================
 # Cognito Authorizer
 # ========================================
@@ -98,6 +104,23 @@ resource "aws_api_gateway_method" "get_quotes" {
 }
 
 resource "aws_api_gateway_method" "quotes_options" {
+  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id   = aws_api_gateway_resource.quotes.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# ========================================
+# API Gateway Methods - /notify
+# ========================================
+resource "aws_api_gateway_method" "post_notify" {
+  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id   = aws_api_gateway_resource.quotes.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "notify_options" {
   rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
   resource_id   = aws_api_gateway_resource.quotes.id
   http_method   = "OPTIONS"
@@ -294,6 +317,29 @@ resource "aws_api_gateway_integration" "quotes_options" {
 }
 
 # ========================================
+# Lambda Integrations - /notify
+# ========================================
+resource "aws_api_gateway_integration" "post_notify_lambda_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id             = aws_api_gateway_resource.notify.id
+  http_method             = aws_api_gateway_method.post_notify.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.test_notifs_lambda.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "notify_options" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.notify.id
+  http_method = aws_api_gateway_method.notify_options.http_method
+  type        = "MOCK"
+  
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+# ========================================
 # CORS Method Responses - /stocks
 # ========================================
 resource "aws_api_gateway_method_response" "stocks_options_200" {
@@ -358,6 +404,37 @@ resource "aws_api_gateway_integration_response" "watchlist_options" {
 # ========================================
 # CORS Method Responses - /quotes
 # ========================================
+resource "aws_api_gateway_method_response" "notify_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.notify.id
+  http_method = aws_api_gateway_method.notify_options.http_method
+  status_code = "200"
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "notify_options" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.notify.id
+  http_method = aws_api_gateway_method.notify_options.http_method
+  status_code = "200"
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+  
+  depends_on = [aws_api_gateway_integration.notify_options]
+}
+
+# ========================================
+# CORS Method Responses - /quotes
+# ========================================
 resource "aws_api_gateway_method_response" "quotes_options_200" {
   rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
   resource_id = aws_api_gateway_resource.quotes.id
@@ -409,22 +486,27 @@ resource "aws_api_gateway_deployment" "api_deployment" {
       aws_api_gateway_resource.watchlist.id,
       aws_api_gateway_resource.quotes.id,
       aws_api_gateway_resource.stock_history.id,  # ADD THIS
+      aws_api_gateway_resource.notify.id,
       aws_api_gateway_method.get_stocks.id,
       aws_api_gateway_method.get_watchlist.id,
       aws_api_gateway_method.post_watchlist.id,
       aws_api_gateway_method.delete_watchlist.id,
       aws_api_gateway_method.get_quotes.id,
       aws_api_gateway_method.get_stock_history.id,  # ADD THIS
+      aws_api_gateway_method.post_notify.id,
       aws_api_gateway_method.stocks_options.id,
       aws_api_gateway_method.watchlist_options.id,
       aws_api_gateway_method.quotes_options.id,
       aws_api_gateway_method.stock_history_options.id,  # ADD THIS
+      aws_api_gateway_method.notify_options.id,
       aws_api_gateway_integration.get_stocks_lambda_integration.id,
       aws_api_gateway_integration.get_watchlist_lambda_integration.id,
       aws_api_gateway_integration.post_watchlist_lambda_integration.id,
       aws_api_gateway_integration.delete_watchlist_lambda_integration.id,
       aws_api_gateway_integration.get_quotes_lambda_integration.id,
       aws_api_gateway_integration.get_stock_history_lambda_integration.id,  # ADD THIS
+      aws_api_gateway_integration.post_notify_lambda_integration.id,
+      aws_api_gateway_integration.notify_options.id,
       aws_api_gateway_integration.stocks_options.id,
       aws_api_gateway_integration.watchlist_options.id,
       aws_api_gateway_integration.quotes_options.id,
@@ -443,14 +525,17 @@ resource "aws_api_gateway_deployment" "api_deployment" {
     aws_api_gateway_integration.delete_watchlist_lambda_integration,
     aws_api_gateway_integration.get_quotes_lambda_integration,
     aws_api_gateway_integration.get_stock_history_lambda_integration,  # ADD THIS
+    aws_api_gateway_integration.post_notify_lambda_integration,
     aws_api_gateway_integration.stocks_options,
     aws_api_gateway_integration.watchlist_options,
     aws_api_gateway_integration.quotes_options,
     aws_api_gateway_integration.stock_history_options,  # ADD THIS
+    aws_api_gateway_integration.notify_options,
     aws_api_gateway_integration_response.stocks_options,
     aws_api_gateway_integration_response.watchlist_options,
     aws_api_gateway_integration_response.quotes_options,
     aws_api_gateway_integration_response.stock_history_options,  # ADD THIS
+    aws_api_gateway_integration_response.notify_options,
   ]
 }
 
