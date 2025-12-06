@@ -487,7 +487,7 @@ def lambda_handler(event, context):
                 if not user_id or not ticker:
                     return _resp(400, {"error": "user_id and ticker are required"})
                 ticker = ticker.strip().upper()
-                remove_from_watchlist(conn, int(user_id), ticker)
+                remove_from_watchlist(conn, str(user_id), ticker)
                 return _resp(200, {"message": "removed", "ticker": ticker})
             
             return _resp(404, {"error": "not found", "path": path, "method": method})             
