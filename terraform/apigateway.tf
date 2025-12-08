@@ -175,6 +175,25 @@ resource "aws_iam_role_policy" "lambda_vpc_access" {
   depends_on = [aws_iam_role.lambda_role]
 }
 
+resource "aws_iam_role_policy" "attach_invoke_another" {
+  name = "invoke-other-lambda"
+  role = aws_iam_role.lambda_role.id
+
+  policy      = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "lambda:InvokeFunction"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+  depends_on = [aws_iam_role.lambda_role]
+}
+
 # ========================================
 # Lambda Functions
 # ========================================
