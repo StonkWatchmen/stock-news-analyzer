@@ -15,6 +15,7 @@ on:
           - jasonchilowercase
           - varun
           - anthonyl
+          - demo
       # Input parameter to choose between apply or destroy actions
       action:
         description: 'Terraform Action to Perform'
