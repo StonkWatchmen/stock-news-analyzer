@@ -1,3 +1,20 @@
+.dashboard-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 16px 0;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .dashboard-bar h2 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
 .available-stocks-section {
     width: 100%;
     max-width: 1200px;

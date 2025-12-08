@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Watchlist from "../components/Watchlist";
 import Chart from "../components/Chart";
+import TestNotificationButton from "../components/TestNotifctionButton";
 import SignOut from "./SignOut";
 import "./Dashboard.css";
 
@@ -90,6 +91,7 @@ function Dashboard() {
       <div className="dashboard-bar">
         <h2>Your Dashboard</h2>
         <SignOut />
+        <TestNotificationButton />
       </div>
       
       {/* Available Stocks Section */}
