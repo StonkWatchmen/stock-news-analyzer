@@ -15,7 +15,7 @@ export default function PullDownCaller() {
 
         try {
             const res = await fetch(`${API_ENDPOINT}/pulldown`, {
-                method: 'POST',
+                method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                 },

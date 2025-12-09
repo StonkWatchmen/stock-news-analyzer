@@ -676,13 +676,13 @@ resource "aws_api_gateway_deployment" "api_deployment" {
     aws_api_gateway_method_response.post_notify_200,
     aws_api_gateway_method_response.post_notify_500,
 
-    aws_api_gateway_integration.pulldown_options.id,
-    aws_api_gateway_integration.get_pulldown_lambda_integration.id,
-    aws_api_gateway_method_response.get_pulldown_200.id,
-    aws_api_gateway_method_response.get_pulldown_500.id,
-    aws_api_gateway_method.get_pulldown.id,
-    aws_api_gateway_method.pulldown_options.id,
-    aws_api_gateway_resource.pulldown.id,
+    aws_api_gateway_integration.pulldown_options,
+    aws_api_gateway_integration.get_pulldown_lambda_integration,
+    aws_api_gateway_method_response.get_pulldown_200,
+    aws_api_gateway_method_response.get_pulldown_500,
+    aws_api_gateway_method.get_pulldown,
+    aws_api_gateway_method.pulldown_options,
+    aws_api_gateway_resource.pulldown,
   ]
 }
 
