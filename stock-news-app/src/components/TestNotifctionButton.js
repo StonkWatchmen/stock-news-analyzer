@@ -24,7 +24,6 @@ export default function ApiGatewayCaller() {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
 
-            const data = await res.json();
         } catch (err) {
             console.error(err);
         } finally {
