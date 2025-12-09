@@ -117,11 +117,10 @@ def lambda_handler(event, context):
         skipped_emails = []
 
         with conn.cursor() as cur:
-            cur.execute("SELECT id, email FROM users;")
+            cur.execute("SELECT email FROM users;")
             all_user_info = cur.fetchall()
 
             for user in all_user_info:
-                user_id = user["id"]
                 email = user["email"]
 
                 if email.lower() == "demo-user-1@example.com":
@@ -136,7 +135,7 @@ def lambda_handler(event, context):
                     continue
 
                 # Get user's watchlist data
-                watchlist_data = get_user_watchlist_data(cur, user_id)
+                watchlist_data = get_user_watchlist_data(cur)
                 
                 # Format the email message
                 message_text = format_watchlist_email(email, watchlist_data)
