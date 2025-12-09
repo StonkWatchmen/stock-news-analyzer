@@ -2,9 +2,7 @@ import { useState } from 'react';
 
 export default function ApiGatewayCaller() {
     const [loading, setLoading] = useState(false);
-    const [response, setResponse] = useState(null);
-    const [error, setError] = useState(null);
-
+    
     // API endpoint injected at build time from environment variable
     const API_ENDPOINT = process.env.REACT_APP_API_BASE_URL
 
