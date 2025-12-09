@@ -507,8 +507,8 @@ resource "aws_api_gateway_integration_response" "notify_options" {
 
 # Method response for POST /pulldown to allow CORS headers
 resource "aws_api_gateway_method_response" "pulldown_options" {
-  rest_api_id = aws_api_gateway_rest_api.your_api.id
-  resource_id = aws_api_gateway_resource.your_resource.id
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.pulldown.id
   http_method = aws_api_gateway_method.pulldown_options.http_method
   status_code = "200"
 
