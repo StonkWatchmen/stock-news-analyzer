@@ -505,7 +505,22 @@ resource "aws_api_gateway_integration_response" "notify_options" {
   depends_on = [aws_api_gateway_integration.notify_options]
 }
 
-# Method response for POST /notify to allow CORS headers
+# Method response for POST /pulldown to allow CORS headers
+resource "aws_api_gateway_method_response" "pulldown_options" {
+  rest_api_id = aws_api_gateway_rest_api.your_api.id
+  resource_id = aws_api_gateway_resource.your_resource.id
+  http_method = aws_api_gateway_method.pulldown_options.http_method
+  status_code = "200"
+
+  response_models = {
+    "application/json" = "Empty"
+  }
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = true
+  }
+}
+
 resource "aws_api_gateway_method_response" "get_pulldown_200" {
   rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
   resource_id = aws_api_gateway_resource.pulldown.id
@@ -546,7 +561,7 @@ resource "aws_api_gateway_integration_response" "pulldown_options" {
   
   depends_on = [
     aws_api_gateway_integration.pulldown_options,
-    aws_api_gateway_method_response.pulldown_options
+    aws_api_gateway_method_response.pulldown_options,
   ]
 }
 
