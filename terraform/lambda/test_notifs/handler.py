@@ -88,7 +88,7 @@ def format_watchlist_email(email, watchlist_data):
             message += f"   Price: N/A\n"
         
         if sentiment is not None:
-            sentiment_label = "Positive" if sentiment > 0 else "Negative" if sentiment < 0 else "Neutral"
+            sentiment_label = "Positive" if sentiment > 0.1 else "Negative" if sentiment < -0.1 else "Neutral"
             message += f"   Sentiment: {sentiment_label} ({sentiment:.3f})\n"
         else:
             message += f"   Sentiment: N/A\n"
