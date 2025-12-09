@@ -3,6 +3,7 @@ import Watchlist from "../components/Watchlist";
 import Chart from "../components/Chart";
 import TestNotificationButton from "../components/TestNotifctionButton";
 import SignOut from "./SignOut";
+import PullDataButton from "../components/PullDataButton"
 import "./Dashboard.css";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL;
@@ -92,6 +93,7 @@ function Dashboard() {
         <h2>Your Dashboard</h2>
         <SignOut />
         <TestNotificationButton />
+        <PullDataButton />
       </div>
       
       {/* Available Stocks Section */}

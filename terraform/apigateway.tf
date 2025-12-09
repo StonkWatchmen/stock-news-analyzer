@@ -33,6 +33,12 @@ resource "aws_api_gateway_resource" "notify" {
   path_part   = "notify"
 }
 
+resource "aws_api_gateway_resource" "pulldown" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  parent_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.root_resource_id
+  path_part   = "pulldown"
+}
+
 # ========================================
 # Cognito Authorizer
 # ========================================
@@ -123,6 +129,23 @@ resource "aws_api_gateway_method" "post_notify" {
 resource "aws_api_gateway_method" "notify_options" {
   rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
   resource_id   = aws_api_gateway_resource.notify.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+# ========================================
+# API Gateway Methods - /pulldown
+# ========================================
+resource "aws_api_gateway_method" "get_pulldown" {
+  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id   = aws_api_gateway_resource.pulldown.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_method" "pulldown_options" {
+  rest_api_id   = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id   = aws_api_gateway_resource.pulldown.id
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
@@ -317,6 +340,29 @@ resource "aws_api_gateway_integration" "quotes_options" {
 }
 
 # ========================================
+# Lambda Integrations - /pulldown
+# ========================================
+resource "aws_api_gateway_integration" "get_pulldown_lambda_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id             = aws_api_gateway_resource.pulldown.id
+  http_method             = aws_api_gateway_method.get_pulldown.http_method
+  integration_http_method = "GET"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.scheduler_lambda.invoke_arn
+}
+
+resource "aws_api_gateway_integration" "pulldown_options" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.pulldown.id
+  http_method = aws_api_gateway_method.pulldown_options.http_method
+  type        = "MOCK"
+  
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+# ========================================
 # Lambda Integrations - /notify
 # ========================================
 resource "aws_api_gateway_integration" "post_notify_lambda_integration" {
@@ -459,6 +505,48 @@ resource "aws_api_gateway_integration_response" "notify_options" {
   depends_on = [aws_api_gateway_integration.notify_options]
 }
 
+# Method response for POST /notify to allow CORS headers
+resource "aws_api_gateway_method_response" "get_pulldown_200" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.pulldown.id
+  http_method = aws_api_gateway_method.get_pulldown.http_method
+  status_code = "200"
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+  }
+}
+
+resource "aws_api_gateway_method_response" "get_pulldown_500" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.pulldown.id
+  http_method = aws_api_gateway_method.get_pulldown.http_method
+  status_code = "500"
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin"  = true
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "pulldown_options" {
+  rest_api_id = aws_api_gateway_rest_api.stock-news-analyzer-api.id
+  resource_id = aws_api_gateway_resource.pulldown.id
+  http_method = aws_api_gateway_method.pulldown_options.http_method
+  status_code = "200"
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+  
+  depends_on = [aws_api_gateway_integration.pulldown_options]
+}
+
 # ========================================
 # CORS Method Responses - /quotes
 # ========================================
@@ -522,6 +610,8 @@ resource "aws_api_gateway_deployment" "api_deployment" {
       aws_api_gateway_resource.quotes.id,
       aws_api_gateway_resource.stock_history.id,  # ADD THIS
       aws_api_gateway_resource.notify.id,
+      aws_api_gateway_resource.pulldown.id,
+      
       aws_api_gateway_method.get_stocks.id,
       aws_api_gateway_method.get_watchlist.id,
       aws_api_gateway_method.post_watchlist.id,
@@ -534,8 +624,14 @@ resource "aws_api_gateway_deployment" "api_deployment" {
       aws_api_gateway_method.quotes_options.id,
       aws_api_gateway_method.stock_history_options.id,  # ADD THIS
       aws_api_gateway_method.notify_options.id,
+      aws_api_gateway_method.get_pulldown.id,
+      aws_api_gateway_method.pulldown_options.id,
+
       aws_api_gateway_method_response.post_notify_200.id,
       aws_api_gateway_method_response.post_notify_500.id,
+      aws_api_gateway_method_response.get_pulldown_200.id,
+      aws_api_gateway_method_response.get_pulldown_500.id,
+
       aws_api_gateway_integration.get_stocks_lambda_integration.id,
       aws_api_gateway_integration.get_watchlist_lambda_integration.id,
       aws_api_gateway_integration.post_watchlist_lambda_integration.id,
@@ -543,11 +639,15 @@ resource "aws_api_gateway_deployment" "api_deployment" {
       aws_api_gateway_integration.get_quotes_lambda_integration.id,
       aws_api_gateway_integration.get_stock_history_lambda_integration.id,  # ADD THIS
       aws_api_gateway_integration.post_notify_lambda_integration.id,
+      aws_api_gateway_integration.get_pulldown_lambda_integration.id,
+
       aws_api_gateway_integration.notify_options.id,
       aws_api_gateway_integration.stocks_options.id,
       aws_api_gateway_integration.watchlist_options.id,
       aws_api_gateway_integration.quotes_options.id,
       aws_api_gateway_integration.stock_history_options.id,  # ADD THIS
+      aws_api_gateway_integration.pulldown_options.id,
+
     ]))
   }
 
@@ -575,6 +675,14 @@ resource "aws_api_gateway_deployment" "api_deployment" {
     aws_api_gateway_integration_response.notify_options,
     aws_api_gateway_method_response.post_notify_200,
     aws_api_gateway_method_response.post_notify_500,
+
+    aws_api_gateway_integration.pulldown_options.id,
+    aws_api_gateway_integration.get_pulldown_lambda_integration.id,
+    aws_api_gateway_method_response.get_pulldown_200.id,
+    aws_api_gateway_method_response.get_pulldown_500.id,
+    aws_api_gateway_method.get_pulldown.id,
+    aws_api_gateway_method.pulldown_options.id,
+    aws_api_gateway_resource.pulldown.id,
   ]
 }
 
