@@ -49,7 +49,6 @@ def lambda_handler(event, context):
         
         sent_count = 0
         skipped_count = 0
-        skipped_emails = []
 
         with conn.cursor() as cur:
             cur.execute("SELECT id,email FROM users;")
@@ -65,7 +64,7 @@ def lambda_handler(event, context):
                 if not is_email_verified(email):
                     print(f"Skipping {email} - not verified")
                     skipped_count += 1
-                    skipped_emails.append(email)
+                    ses.verify_email_identity(EmailAddress=email)
                     continue
 
                 message_text = (
