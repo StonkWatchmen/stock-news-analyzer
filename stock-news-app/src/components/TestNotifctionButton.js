@@ -57,39 +57,6 @@ export default function ApiGatewayCaller() {
             >
                 {loading ? 'Sending...' : 'Send Notification'}
             </button>
-
-            {response && (
-                <div style={{
-                    padding: '12px',
-                    background: 'var(--surface-hover)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    maxWidth: '300px',
-                    wordBreak: 'break-word'
-                }}>
-                    <strong>Response:</strong>
-                    <pre style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--muted)' }}>
-                        {JSON.stringify(response, null, 2)}
-                    </pre>
-                </div>
-            )}
-
-            {error && (
-                <div style={{
-                    padding: '12px',
-                    background: 'rgba(248, 81, 73, 0.1)',
-                    border: '1px solid var(--danger)',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    color: 'var(--danger)',
-                    maxWidth: '300px',
-                    wordBreak: 'break-word'
-                }}>
-                    <strong>Error:</strong>
-                    <p style={{ margin: '8px 0 0 0' }}>{error}</p>
-                </div>
-            )}
         </div>
     );
 }
