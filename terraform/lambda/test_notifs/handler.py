@@ -36,6 +36,72 @@ def is_email_verified(email):
         print(f"Error checking verification for {email}: {str(e)}")
         return False
 
+def get_user_watchlist_data(cur, user_id):
+    """Get stocks from user's watchlist with latest price and sentiment."""
+    query = """
+        SELECT 
+            s.ticker,
+            sh.price,
+            sh.avg_sentiment,
+            sh.recorded_at as last_updated
+        FROM watchlist w
+        JOIN stocks s ON w.stock_id = s.id
+        LEFT JOIN (
+            SELECT stock_id, price, avg_sentiment, recorded_at
+            FROM stock_history sh1
+            WHERE recorded_at = (
+                SELECT MAX(recorded_at)
+                FROM stock_history sh2
+                WHERE sh2.stock_id = sh1.stock_id
+            )
+        ) sh ON s.id = sh.stock_id
+        WHERE w.user_id = %s
+        ORDER BY s.ticker
+    """
+    
+    cur.execute(query, (user_id,))
+    return cur.fetchall()
+
+def format_watchlist_email(email, watchlist_data):
+    """Format watchlist data into email text."""
+    if not watchlist_data:
+        return (
+            f"Hello,\n\n"
+            "You don't have any stocks in your watchlist yet.\n"
+            "Add some stocks to start receiving personalized updates!\n\n"
+            "Best regards,\n"
+            "Stock News Analyzer"
+        )
+    
+    message = f"Hello,\n\n"
+    message += "Here are your watchlist stocks and their latest updates:\n\n"
+    
+    for stock in watchlist_data:
+        ticker = stock['ticker']
+        price = stock['price']
+        sentiment = stock['avg_sentiment']
+        
+        message += f"📊 {ticker}\n"
+        
+        if price is not None:
+            message += f"   Price: ${price:.2f}\n"
+        else:
+            message += f"   Price: N/A\n"
+        
+        if sentiment is not None:
+            sentiment_label = "Positive" if sentiment > 0 else "Negative" if sentiment < 0 else "Neutral"
+            message += f"   Sentiment: {sentiment_label} ({sentiment:.3f})\n"
+        else:
+            message += f"   Sentiment: N/A\n"
+        
+        message += "\n"
+    
+    message += "Stay informed and happy investing!\n\n"
+    message += "Best regards,\n"
+    message += "Stock News Analyzer"
+    
+    return message
+
 def lambda_handler(event, context):
     # CORS headers for all responses
     cors_headers = {
@@ -49,12 +115,14 @@ def lambda_handler(event, context):
         
         sent_count = 0
         skipped_count = 0
+        skipped_emails = []
 
         with conn.cursor() as cur:
-            cur.execute("SELECT id,email FROM users;")
+            cur.execute("SELECT id, email FROM users;")
             all_user_info = cur.fetchall()
 
             for user in all_user_info:
+                user_id = user["id"]
                 email = user["email"]
 
                 if email.lower() == "demo-user-1@example.com":
@@ -64,19 +132,21 @@ def lambda_handler(event, context):
                 if not is_email_verified(email):
                     print(f"Skipping {email} - not verified")
                     skipped_count += 1
+                    skipped_emails.append(email)
                     ses.verify_email_identity(EmailAddress=email)
                     continue
 
-                message_text = (
-                    f"Hello {email},\n\n"
-                    "Here is your personalized notification.\n"
-                )
+                # Get user's watchlist data
+                watchlist_data = get_user_watchlist_data(cur, user_id)
+                
+                # Format the email message
+                message_text = format_watchlist_email(email, watchlist_data)
 
                 ses.send_email(
                     Source=email,
                     Destination={"ToAddresses": [email]},
                     Message={
-                        "Subject": {"Data": f"Your personalized stock updates"},
+                        "Subject": {"Data": "Your Stock Watchlist Update"},
                         "Body": {"Text": {"Data": message_text}}
                     }
                 )
