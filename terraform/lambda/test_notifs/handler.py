@@ -36,7 +36,7 @@ def is_email_verified(email):
         print(f"Error checking verification for {email}: {str(e)}")
         return False
 
-def get_user_watchlist_data(cur, user_id):
+def get_user_watchlist_data(cur):
     """Get stocks from user's watchlist with latest price and sentiment."""
     query = """
         SELECT 
@@ -55,11 +55,10 @@ def get_user_watchlist_data(cur, user_id):
                 WHERE sh2.stock_id = sh1.stock_id
             )
         ) sh ON s.id = sh.stock_id
-        WHERE w.user_id = %s
         ORDER BY s.ticker
     """
     
-    cur.execute(query, (user_id,))
+    cur.execute(query)
     return cur.fetchall()
 
 def format_watchlist_email(email, watchlist_data):
