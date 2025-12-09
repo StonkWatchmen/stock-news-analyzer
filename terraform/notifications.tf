@@ -1,7 +1,3 @@
-resource "aws_ses_email_identity" "dev_email" {
-  email = "adventurelieu@gmail.com"
-}
-
 resource "aws_iam_role_policy" "lambda_ses_send" {
   role = aws_iam_role.lambda_role.id
 
@@ -11,6 +7,8 @@ resource "aws_iam_role_policy" "lambda_ses_send" {
       {
         Effect   = "Allow"
         Action   = [
+          "ses:VerifyEmailIdentity",
+          "ses:GetIdentityVerificationAttributes",
           "ses:SendEmail",
           "ses:SendRawEmail"
         ]

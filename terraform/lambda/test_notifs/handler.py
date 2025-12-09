@@ -18,6 +18,24 @@ def get_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
+def is_email_verified(email):
+    """Check if an email is verified in SES."""
+    try:
+        response = ses.get_identity_verification_attributes(
+            Identities=[email]
+        )
+        
+        verification_attrs = response.get('VerificationAttributes', {})
+        
+        if email in verification_attrs:
+            status = verification_attrs[email]['VerificationStatus']
+            return status == 'Success'
+        
+        return False
+    except Exception as e:
+        print(f"Error checking verification for {email}: {str(e)}")
+        return False
+
 def lambda_handler(event, context):
     # CORS headers for all responses
     cors_headers = {
@@ -27,9 +45,11 @@ def lambda_handler(event, context):
     }
     
     try:
-        dev_email = os.environ.get("DEV_EMAIL")
-
         conn = get_connection()
+        
+        sent_count = 0
+        skipped_count = 0
+        skipped_emails = []
 
         with conn.cursor() as cur:
             cur.execute("SELECT id,email FROM users;")
@@ -41,25 +61,38 @@ def lambda_handler(event, context):
                 if email.lower() == "demo-user-1@example.com":
                     continue
 
+                # Check if email is verified before attempting to send
+                if not is_email_verified(email):
+                    print(f"Skipping {email} - not verified")
+                    skipped_count += 1
+                    skipped_emails.append(email)
+                    continue
+
                 message_text = (
                     f"Hello {email},\n\n"
                     "Here is your personalized notification.\n"
                 )
 
                 ses.send_email(
-                    Source=dev_email,
+                    Source=email,
                     Destination={"ToAddresses": [email]},
                     Message={
                         "Subject": {"Data": f"Your personalized stock updates"},
                         "Body": {"Text": {"Data": message_text}}
                     }
                 )
+                sent_count += 1
 
         return {
             "isBase64Encoded": False,
             "statusCode": 200,
             "headers": cors_headers,
-            "body": json.dumps({"status": "success"})
+            "body": json.dumps({
+                "status": "success",
+                "sent": sent_count,
+                "skipped": skipped_count,
+                "skipped_emails": skipped_emails
+            })
         }
     except Exception as e:
         # Return error response with CORS headers
