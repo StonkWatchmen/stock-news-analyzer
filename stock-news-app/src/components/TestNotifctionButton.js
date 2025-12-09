@@ -2,14 +2,12 @@ import { useState } from 'react';
 
 export default function ApiGatewayCaller() {
     const [loading, setLoading] = useState(false);
-    
+
     // API endpoint injected at build time from environment variable
     const API_ENDPOINT = process.env.REACT_APP_API_BASE_URL
 
     const callApi = async () => {
         setLoading(true);
-        setError(null);
-        setResponse(null);
 
         try {
             const res = await fetch(`${API_ENDPOINT}/notify`, {
@@ -27,9 +25,8 @@ export default function ApiGatewayCaller() {
             }
 
             const data = await res.json();
-            setResponse(data);
         } catch (err) {
-            setError(err.message);
+            console.error(err);
         } finally {
             setLoading(false);
         }
